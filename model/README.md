@@ -1,5 +1,5 @@
 # Body model
 
-`body.bin` and `body.json` are a semi-realistic male body built in code (`build_body.py`, not shown in this repo):
-smooth shapes are blended into one mesh, then split into the body regions the app uses.
-The model was made for this app and uses no third-party 3D assets.
+`body.bin` and `body.json` are built from the **MakeHuman base mesh**, released as CC0 (public domain).
+The mesh was scaled to 1.76 m, and its vertices were grouped into body regions by position.
+Region boundaries are approximate, because the mesh has no per-muscle labels.

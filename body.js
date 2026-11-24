@@ -58,22 +58,23 @@
         fetch('model/body.json').then((r) => { if (!r.ok) throw new Error('model json'); return r.json(); }),
         fetch('model/body.bin').then((r) => { if (!r.ok) throw new Error('model bin'); return r.arrayBuffer(); }),
       ]).then(([meta, buf]) => {
+        if (meta.format !== 'v2') throw new Error('model format');
+        const total = meta.totalVertices;
+        const positions = new Float32Array(buf, 0, total * 3);
+        const normals = new Float32Array(buf, meta.normalsOffset, total * 3);
         const group = new THREE.Group();
         const meshes = [];
         for (const g of meta.groups) {
           const geom = new THREE.BufferGeometry();
-          const pos = new Float32Array(buf, g.vStart * 12, g.vCount * 3);
-          const idx = new Uint32Array(buf, meta.vertexBytes + g.iStart * 4, g.iCount);
-          geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-          geom.setIndex(new THREE.BufferAttribute(idx, 1));
-          geom.computeVertexNormals();
-          const isOther = g.region === 'skin' || g.region === 'other';
-          const base = SKIN;
-          const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: base, roughness: 0.55, metalness: 0.02 }));
-          mesh.userData.region = isOther ? null : g.region;
-          mesh.userData.base = base;
+          geom.setAttribute('position', new THREE.BufferAttribute(positions.subarray(g.vStart * 3, (g.vStart + g.vCount) * 3), 3));
+          geom.setAttribute('normal', new THREE.BufferAttribute(normals.subarray(g.vStart * 3, (g.vStart + g.vCount) * 3), 3));
+          geom.setIndex(new THREE.BufferAttribute(new Uint32Array(buf, meta.indexOffset + g.iStart * 4, g.iCount), 1));
+          const unmapped = g.region === 'skin' || g.region === 'other';
+          const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.55, metalness: 0.0 }));
+          mesh.userData.region = unmapped ? null : g.region;
+          mesh.userData.base = SKIN;
           group.add(mesh);
-          if (!isOther) meshes.push(mesh);
+          if (!unmapped) meshes.push(mesh);
         }
         return { group, meshes, source: 'model' };
       });
@@ -140,7 +141,7 @@
     renderer.setPixelRatio(Math.min(root.devicePixelRatio || 1, 2));
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
-    camera.position.set(0, 0.95, 4.2);
+    camera.position.set(0, 0.9, 4.2);
     camera.lookAt(0, 0.9, 0);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1.1));
     const key = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -177,9 +178,14 @@
 
     // Drag to turn: horizontal drag spins through a full 360 degrees; vertical drag tilts (about +/-70 degrees).
     const view = { yaw: 0, pitch: 0, vyaw: 0, vpitch: 0 };
-    const PITCH_MAX = 1.2;
+    const PITCH_MAX = 0.6;
+    const ORBIT_R = 4.2;
+    const TARGET_Y = 0.9;
     function applyRotation() {
-      fig.group.rotation.set(view.pitch, view.yaw, 0, 'YXZ');
+      fig.group.rotation.set(0, view.yaw, 0);
+      const elev = Math.max(-0.6, Math.min(0.6, view.pitch));
+      camera.position.set(0, TARGET_Y + ORBIT_R * Math.sin(elev), ORBIT_R * Math.cos(elev));
+      camera.lookAt(0, TARGET_Y, 0);
     }
     let last = null;
     let lastT = 0;
