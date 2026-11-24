@@ -5,8 +5,8 @@
   const THREE = root.THREE;
   let inst = null;
 
-  const BASE = 0xd9b08c; // skin tone for unhighlighted body
-  const SKIN = 0xd9b08c;
+  const BASE = 0x7d7d95; // muscle colour for unhighlighted body
+  const SKIN = 0x464658; // head, hands, feet and joints (darker, like a muscle chart)
   const HEAT = new THREE.Color(0xef6461);
   const SORE_COLORS = [null, 0xf0b429, 0xf0893b, 0xef4444];
 
@@ -58,21 +58,28 @@
         fetch('model/body.json').then((r) => { if (!r.ok) throw new Error('model json'); return r.json(); }),
         fetch('model/body.bin').then((r) => { if (!r.ok) throw new Error('model bin'); return r.arrayBuffer(); }),
       ]).then(([meta, buf]) => {
-        if (meta.format !== 'v2') throw new Error('model format');
+        if (meta.format !== 'v3') throw new Error('model format');
         const total = meta.totalVertices;
         const positions = new Float32Array(buf, 0, total * 3);
         const normals = new Float32Array(buf, meta.normalsOffset, total * 3);
+        const shade = new Float32Array(buf, meta.shadeOffset, total);
         const group = new THREE.Group();
         const meshes = [];
         for (const g of meta.groups) {
           const geom = new THREE.BufferGeometry();
           geom.setAttribute('position', new THREE.BufferAttribute(positions.subarray(g.vStart * 3, (g.vStart + g.vCount) * 3), 3));
           geom.setAttribute('normal', new THREE.BufferAttribute(normals.subarray(g.vStart * 3, (g.vStart + g.vCount) * 3), 3));
+          const colors = new Float32Array(g.vCount * 3);
+          for (let i = 0; i < g.vCount; i++) {
+            const v = shade[g.vStart + i];
+            colors[i * 3] = v; colors[i * 3 + 1] = v; colors[i * 3 + 2] = v;
+          }
+          geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
           geom.setIndex(new THREE.BufferAttribute(new Uint32Array(buf, meta.indexOffset + g.iStart * 4, g.iCount), 1));
           const unmapped = g.region === 'skin' || g.region === 'other';
-          const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.55, metalness: 0.0 }));
+          const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: unmapped ? SKIN : BASE, vertexColors: true, roughness: 0.7, metalness: 0.0 }));
           mesh.userData.region = unmapped ? null : g.region;
-          mesh.userData.base = SKIN;
+          mesh.userData.base = unmapped ? SKIN : BASE;
           group.add(mesh);
           if (!unmapped) meshes.push(mesh);
         }

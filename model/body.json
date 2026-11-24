@@ -1,125 +1,126 @@
 {
- "format": "v2",
- "totalVertices": 21414,
- "normalsOffset": 256968,
- "indexOffset": 513936,
+ "format": "v3",
+ "totalVertices": 99183,
+ "normalsOffset": 1190196,
+ "shadeOffset": 2380392,
+ "indexOffset": 2777124,
  "groups": [
   {
    "region": "abs",
    "vStart": 0,
-   "vCount": 644,
+   "vCount": 6801,
    "iStart": 0,
-   "iCount": 3150
+   "iCount": 39144
   },
   {
    "region": "adductors",
-   "vStart": 644,
-   "vCount": 358,
-   "iStart": 3150,
-   "iCount": 1503
+   "vStart": 6801,
+   "vCount": 1645,
+   "iStart": 39144,
+   "iCount": 8535
   },
   {
    "region": "biceps",
-   "vStart": 1002,
-   "vCount": 442,
-   "iStart": 4653,
-   "iCount": 2052
+   "vStart": 8446,
+   "vCount": 3657,
+   "iStart": 47679,
+   "iCount": 20442
   },
   {
    "region": "calves",
-   "vStart": 1444,
-   "vCount": 595,
-   "iStart": 6705,
-   "iCount": 2610
+   "vStart": 12103,
+   "vCount": 10841,
+   "iStart": 68121,
+   "iCount": 61635
   },
   {
    "region": "chest",
-   "vStart": 2039,
-   "vCount": 230,
-   "iStart": 9315,
-   "iCount": 714
+   "vStart": 22944,
+   "vCount": 3148,
+   "iStart": 129756,
+   "iCount": 18006
   },
   {
    "region": "forearms",
-   "vStart": 2269,
-   "vCount": 3546,
-   "iStart": 10029,
-   "iCount": 20412
+   "vStart": 26092,
+   "vCount": 6910,
+   "iStart": 147762,
+   "iCount": 39591
   },
   {
    "region": "glutes",
-   "vStart": 5815,
-   "vCount": 865,
-   "iStart": 30441,
-   "iCount": 4185
+   "vStart": 33002,
+   "vCount": 5571,
+   "iStart": 187353,
+   "iCount": 32163
   },
   {
    "region": "hamstrings",
-   "vStart": 6680,
-   "vCount": 585,
-   "iStart": 34626,
-   "iCount": 2427
+   "vStart": 38573,
+   "vCount": 6674,
+   "iStart": 219516,
+   "iCount": 37962
   },
   {
    "region": "lats",
-   "vStart": 7265,
-   "vCount": 514,
-   "iStart": 37053,
-   "iCount": 2292
+   "vStart": 45247,
+   "vCount": 3326,
+   "iStart": 257478,
+   "iCount": 17739
   },
   {
    "region": "lower_back",
-   "vStart": 7779,
-   "vCount": 750,
-   "iStart": 39345,
-   "iCount": 3567
+   "vStart": 48573,
+   "vCount": 4844,
+   "iStart": 275217,
+   "iCount": 27480
   },
   {
    "region": "neck",
-   "vStart": 8529,
-   "vCount": 2702,
-   "iStart": 42912,
-   "iCount": 14730
+   "vStart": 53417,
+   "vCount": 1944,
+   "iStart": 302697,
+   "iCount": 10818
   },
   {
    "region": "quads",
-   "vStart": 11231,
-   "vCount": 24,
-   "iStart": 57642,
-   "iCount": 63
+   "vStart": 55361,
+   "vCount": 6827,
+   "iStart": 313515,
+   "iCount": 37959
   },
   {
    "region": "shoulders",
-   "vStart": 11255,
-   "vCount": 242,
-   "iStart": 57705,
-   "iCount": 1062
-  },
-  {
-   "region": "skin",
-   "vStart": 11497,
-   "vCount": 7006,
-   "iStart": 58767,
-   "iCount": 37629
+   "vStart": 62188,
+   "vCount": 4226,
+   "iStart": 351474,
+   "iCount": 24147
   },
   {
    "region": "triceps",
-   "vStart": 18503,
-   "vCount": 974,
-   "iStart": 96396,
-   "iCount": 5322
+   "vStart": 66414,
+   "vCount": 3343,
+   "iStart": 375621,
+   "iCount": 18561
   },
   {
    "region": "upper_back",
-   "vStart": 19477,
-   "vCount": 1937,
-   "iStart": 101718,
-   "iCount": 9198
+   "vStart": 69757,
+   "vCount": 2405,
+   "iStart": 394182,
+   "iCount": 13509
+  },
+  {
+   "region": "skin",
+   "vStart": 72162,
+   "vCount": 27021,
+   "iStart": 407691,
+   "iCount": 145941
   }
  ],
  "units": "meters",
  "upAxis": "y",
  "frontAxis": "+z",
- "height": 1.76,
- "source": "MakeHuman base mesh (CC0). Region split done by position."
+ "height": 1.787,
+ "source": "Original procedural figure (built in code, no third-party assets)."
 }
