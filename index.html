@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Workout">
+  <meta name="theme-color" content="#111418">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>Workout & Meals</title>
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="page-title">Workout</h1>
+  </header>
+
+  <main id="view"></main>
+
+  <nav class="tabs" aria-label="Sections">
+    <button data-tab="workout" class="on">Workout</button>
+    <button data-tab="meals">Meals</button>
+    <button data-tab="shopping">Shopping</button>
+    <button data-tab="progress">Progress</button>
+    <button data-tab="body">Body</button>
+    <button data-tab="data">Import</button>
+  </nav>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="lib.js"></script>
+  <script src="body.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
