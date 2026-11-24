@@ -5,7 +5,8 @@
   const THREE = root.THREE;
   let inst = null;
 
-  const BASE = 0x2a2f38;
+  const BASE = 0xd9b08c; // skin tone for unhighlighted body
+  const SKIN = 0xd9b08c;
   const HEAT = new THREE.Color(0xef6461);
   const SORE_COLORS = [null, 0xf0b429, 0xf0893b, 0xef4444];
 
@@ -66,8 +67,8 @@
           geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
           geom.setIndex(new THREE.BufferAttribute(idx, 1));
           geom.computeVertexNormals();
-          const isOther = g.region === 'other';
-          const base = isOther ? 0x6b4a45 : BASE;
+          const isOther = g.region === 'skin' || g.region === 'other';
+          const base = SKIN;
           const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: base, roughness: 0.55, metalness: 0.02 }));
           mesh.userData.region = isOther ? null : g.region;
           mesh.userData.base = base;
@@ -116,7 +117,7 @@
   }
 
   function colorFor(region, opts) {
-    if (!region) return opts.baseFor ? opts.baseFor : BASE;
+    if (!region) return SKIN;
     if (opts.mode === 'heat') {
       const max = Math.max(1, ...Object.values(opts.load));
       const v = opts.load[region] || 0;
@@ -174,22 +175,43 @@
       camera.updateProjectionMatrix();
     }
 
+    // Drag to turn: horizontal drag spins through a full 360 degrees; vertical drag tilts (about +/-70 degrees).
+    const view = { yaw: 0, pitch: 0, vyaw: 0, vpitch: 0 };
+    const PITCH_MAX = 1.2;
+    function applyRotation() {
+      fig.group.rotation.set(view.pitch, view.yaw, 0, 'YXZ');
+    }
+    let last = null;
+    let lastT = 0;
     canvas.addEventListener('pointerdown', (e) => {
       state.down = { x: e.clientX, y: e.clientY };
       state.moved = 0;
-      canvas.setPointerCapture(e.pointerId);
+      last = { x: e.clientX, y: e.clientY };
+      lastT = performance.now();
+      view.vyaw = 0; view.vpitch = 0;
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     });
     canvas.addEventListener('pointermove', (e) => {
       if (!state.down) return;
-      const dx = e.clientX - state.down.x;
-      state.moved += Math.abs(e.movementX) + Math.abs(e.movementY);
-      fig.group.rotation.y += e.movementX * 0.01;
-      state.down = { x: e.clientX, y: e.clientY };
+      const dx = e.clientX - last.x;
+      const dy = e.clientY - last.y;
+      state.moved += Math.abs(dx) + Math.abs(dy);
+      const now = performance.now();
+      const dt = Math.max(1, now - lastT);
+      view.yaw += dx * 0.012;
+      view.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, view.pitch + dy * 0.008));
+      // Track speed so the figure keeps turning briefly after you let go.
+      view.vyaw = (dx * 0.012) / dt * 16;
+      view.vpitch = (dy * 0.008) / dt * 16;
+      last = { x: e.clientX, y: e.clientY };
+      lastT = now;
+      applyRotation();
     });
     canvas.addEventListener('pointerup', (e) => {
       const wasTap = state.down && state.moved < 6;
       state.down = null;
-      if (!wasTap || !state.opts) return;
+      if (!wasTap) return;
+      if (!state.opts) return;
       const rect = canvas.getBoundingClientRect();
       ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -197,6 +219,7 @@
       const hit = raycaster.intersectObjects(fig.meshes, false)[0];
       if (hit && hit.object.userData.region && state.opts.onTap) state.opts.onTap(hit.object.userData.region);
     });
+    canvas.addEventListener('pointercancel', () => { state.down = null; });
 
     function paint(opts) {
       for (const m of fig.meshes) m.material.color.setHex(colorFor(m.userData.region, opts));
@@ -205,6 +228,12 @@
 
     let raf = null;
     function loop() {
+      if (!state.down && (Math.abs(view.vyaw) > 0.0005 || Math.abs(view.vpitch) > 0.0005)) {
+        view.yaw += view.vyaw;
+        view.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, view.pitch + view.vpitch));
+        view.vyaw *= 0.92; view.vpitch *= 0.88;
+        applyRotation();
+      }
       renderer.render(scene, camera);
       raf = root.requestAnimationFrame(loop);
     }
