@@ -1,5 +1,7 @@
-// Offline support: the app shell is cached on first load; exercise images are cached as they are viewed.
-const CACHE = 'workout-app-v4';
+// Offline support.
+// App code (HTML, CSS, JS, data) is fetched from the network first, so updates show up on the next load.
+// Falls back to the cached copy when offline. Exercise images are cached as they are viewed.
+const CACHE = 'workout-app-v5';
 const SHELL = ['./', 'index.html', 'styles.css', 'lib.js', 'body.js', 'app.js', 'vendor/three.min.js', 'manifest.webmanifest',
   'data/exercises.json', 'exercise-names.txt', 'icons/icon-192.png', 'icons/icon-512.png'];
 
@@ -12,14 +14,25 @@ self.addEventListener('activate', (e) => {
     Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
+function isImage(url) { return /\/img\/|\/model\//.test(url.pathname); }
+
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(caches.open(CACHE).then((cache) =>
-    cache.match(e.request).then((hit) => {
+  const url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (isImage(url)) {
+    // Large, rarely-changing files: cache first.
+    e.respondWith(caches.open(CACHE).then((cache) => cache.match(e.request).then((hit) => {
       if (hit) return hit;
-      return fetch(e.request).then((res) => {
-        if (res.ok && new URL(e.request.url).origin === self.location.origin) cache.put(e.request, res.clone());
-        return res;
-      });
+      return fetch(e.request).then((res) => { if (res.ok) cache.put(e.request, res.clone()); return res; });
     })));
+    return;
+  }
+
+  // App code: network first, cached copy when offline.
+  e.respondWith(fetch(e.request).then((res) => {
+    if (res.ok) caches.open(CACHE).then((cache) => cache.put(e.request, res.clone()));
+    return res;
+  }).catch(() => caches.open(CACHE).then((cache) => cache.match(e.request))));
 });
