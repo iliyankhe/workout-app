@@ -1,0 +1,113 @@
+{
+ "vertexBytes": 1744428,
+ "groups": [
+  {
+   "region": "abs",
+   "vStart": 0,
+   "vCount": 9350,
+   "iStart": 0,
+   "iCount": 56100
+  },
+  {
+   "region": "adductors",
+   "vStart": 9350,
+   "vCount": 2664,
+   "iStart": 56100,
+   "iCount": 16032
+  },
+  {
+   "region": "calves",
+   "vStart": 12014,
+   "vCount": 4908,
+   "iStart": 72132,
+   "iCount": 29388
+  },
+  {
+   "region": "chest",
+   "vStart": 16922,
+   "vCount": 3456,
+   "iStart": 101520,
+   "iCount": 20760
+  },
+  {
+   "region": "forearms",
+   "vStart": 20378,
+   "vCount": 1736,
+   "iStart": 122280,
+   "iCount": 10512
+  },
+  {
+   "region": "glutes",
+   "vStart": 22114,
+   "vCount": 5502,
+   "iStart": 132792,
+   "iCount": 32820
+  },
+  {
+   "region": "hamstrings",
+   "vStart": 27616,
+   "vCount": 2252,
+   "iStart": 165612,
+   "iCount": 13260
+  },
+  {
+   "region": "lats",
+   "vStart": 29868,
+   "vCount": 6284,
+   "iStart": 178872,
+   "iCount": 37584
+  },
+  {
+   "region": "lower_back",
+   "vStart": 36152,
+   "vCount": 14039,
+   "iStart": 216456,
+   "iCount": 83982
+  },
+  {
+   "region": "neck",
+   "vStart": 50191,
+   "vCount": 3124,
+   "iStart": 300438,
+   "iCount": 18720
+  },
+  {
+   "region": "other",
+   "vStart": 53315,
+   "vCount": 79480,
+   "iStart": 319158,
+   "iCount": 478146
+  },
+  {
+   "region": "quads",
+   "vStart": 132795,
+   "vCount": 4522,
+   "iStart": 797304,
+   "iCount": 27204
+  },
+  {
+   "region": "shoulders",
+   "vStart": 137317,
+   "vCount": 1538,
+   "iStart": 824508,
+   "iCount": 9204
+  },
+  {
+   "region": "triceps",
+   "vStart": 138855,
+   "vCount": 1802,
+   "iStart": 833712,
+   "iCount": 10764
+  },
+  {
+   "region": "upper_back",
+   "vStart": 140657,
+   "vCount": 4712,
+   "iStart": 844476,
+   "iCount": 28296
+  }
+ ],
+ "units": "meters",
+ "upAxis": "y",
+ "frontAxis": "+z"
+}

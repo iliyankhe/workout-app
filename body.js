@@ -49,6 +49,37 @@
     { r: 'calves', k: 'cyl', a: [0.1, 0.4, -0.06], b: [0.1, 0.1, -0.06], rad: 0.06 },
   ];
 
+  // Real muscle model (Z-Anatomy, CC BY-SA 4.0). Falls back to the simple figure if it fails to load.
+  let modelPromise = null;
+  function loadModel() {
+    if (!modelPromise) {
+      modelPromise = Promise.all([
+        fetch('model/body.json').then((r) => { if (!r.ok) throw new Error('model json'); return r.json(); }),
+        fetch('model/body.bin').then((r) => { if (!r.ok) throw new Error('model bin'); return r.arrayBuffer(); }),
+      ]).then(([meta, buf]) => {
+        const group = new THREE.Group();
+        const meshes = [];
+        for (const g of meta.groups) {
+          const geom = new THREE.BufferGeometry();
+          const pos = new Float32Array(buf, g.vStart * 12, g.vCount * 3);
+          const idx = new Uint32Array(buf, meta.vertexBytes + g.iStart * 4, g.iCount);
+          geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+          geom.setIndex(new THREE.BufferAttribute(idx, 1));
+          geom.computeVertexNormals();
+          const isOther = g.region === 'other';
+          const base = isOther ? 0x6b4a45 : BASE;
+          const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: base, roughness: 0.55, metalness: 0.02 }));
+          mesh.userData.region = isOther ? null : g.region;
+          mesh.userData.base = base;
+          group.add(mesh);
+          if (!isOther) meshes.push(mesh);
+        }
+        return { group, meshes, source: 'model' };
+      });
+    }
+    return modelPromise;
+  }
+
   function buildFigure() {
     const group = new THREE.Group();
     const meshes = [];
@@ -77,6 +108,7 @@
       }
       mesh.material = new THREE.MeshStandardMaterial({ color: BASE, roughness: 0.6, metalness: 0.05 });
       mesh.userData.region = part.r;
+      mesh.userData.base = BASE;
       group.add(mesh);
       if (part.r) meshes.push(mesh);
     }
@@ -84,6 +116,7 @@
   }
 
   function colorFor(region, opts) {
+    if (!region) return opts.baseFor ? opts.baseFor : BASE;
     if (opts.mode === 'heat') {
       const max = Math.max(1, ...Object.values(opts.load));
       const v = opts.load[region] || 0;
@@ -106,14 +139,21 @@
     renderer.setPixelRatio(Math.min(root.devicePixelRatio || 1, 2));
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
-    camera.position.set(0, 1.0, 4.4);
-    camera.lookAt(0, 0.98, 0);
+    camera.position.set(0, 0.95, 4.2);
+    camera.lookAt(0, 0.9, 0);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1.1));
     const key = new THREE.DirectionalLight(0xffffff, 1.2);
     key.position.set(2, 3, 4);
     scene.add(key);
-    const fig = buildFigure();
+    const fig = { group: new THREE.Group(), meshes: [], allMeshes: [] };
     scene.add(fig.group);
+    const attach = (part) => {
+      fig.group.add(part.group);
+      fig.meshes = part.meshes;
+      fig.allMeshes = part.group.children;
+      if (inst && inst.state.opts) inst.paint(inst.state.opts);
+    };
+    loadModel().then(attach).catch(() => attach(buildFigure()));
 
     const state = { opts: null, down: null, moved: 0 };
     const canvas = renderer.domElement;
@@ -160,6 +200,7 @@
 
     function paint(opts) {
       for (const m of fig.meshes) m.material.color.setHex(colorFor(m.userData.region, opts));
+      for (const m of fig.allMeshes || []) if (!m.userData.region) m.material.color.setHex(m.userData.base);
     }
 
     let raf = null;

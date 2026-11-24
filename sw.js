@@ -1,5 +1,5 @@
 // Offline support: the app shell is cached on first load; exercise images are cached as they are viewed.
-const CACHE = 'workout-app-v2';
+const CACHE = 'workout-app-v3';
 const SHELL = ['./', 'index.html', 'styles.css', 'lib.js', 'body.js', 'app.js', 'vendor/three.min.js', 'manifest.webmanifest',
   'data/exercises.json', 'exercise-names.txt', 'icons/icon-192.png', 'icons/icon-512.png'];
 
