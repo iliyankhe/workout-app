@@ -43,11 +43,12 @@
     const e = index && index.byId.get(id);
     return e ? e.name : id;
   }
+  // Shown fixed at the top of the screen, so it is visible even when the save button is far down the list.
   function toast(text, kind) {
     const box = document.createElement('div');
-    box.className = 'msg ' + (kind || 'ok');
+    box.className = 'msg toast ' + (kind || 'ok');
     box.textContent = text;
-    view.prepend(box);
+    document.body.appendChild(box);
     setTimeout(() => box.remove(), 4000);
   }
 
@@ -365,13 +366,14 @@
       view.innerHTML = '<div class="card"><h3>No workouts logged yet</h3><p class="muted">Save a workout on the Workout tab and it will show up here.</p></div>';
       return;
     }
-    const selected = ids.includes(state.progressEx) ? state.progressEx : ids[0];
+    const selected = state.progressEx && index.byId.has(state.progressEx) ? state.progressEx : ids[0];
     const rows = L.exerciseHistory(state.logs, selected);
     const maxW = Math.max(1, ...rows.map((r) => r.topWeight));
-    let html = '<label>Exercise</label><select id="prog-ex">' +
-      ids.map((id) => '<option value="' + esc(id) + '"' + (id === selected ? ' selected' : '') + '>' + esc(exName(id)) + '</option>').join('') +
-      '</select>';
+    let html = '<label>Exercise (type a name)</label>' +
+      '<input id="prog-type" list="prog-names" value="' + esc(exName(selected)) + '" placeholder="e.g. Bench Press">' +
+      '<datalist id="prog-names">' + exercises.map((e) => '<option value="' + esc(e.name) + '">').join('') + '</datalist>';
     html += '<h2>Weight lifted over time</h2><div class="card">';
+    if (!rows.length) html += '<p class="muted">No saved sets for this exercise yet.</p>';
     rows.forEach((r, i) => {
       const prev = i ? rows[i - 1].topWeight : null;
       const delta = prev == null ? '' : (r.topWeight - prev);
@@ -602,7 +604,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v28';
+  const APP_VERSION = 'v29';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -812,7 +814,11 @@
     if (t.id === 'meal-unit') { mealUnit = t.value; state.mealUnit = mealUnit; save(); renderMeals(); return; }
     if (t.id === 'shop-unit') { mealUnit = t.value; state.mealUnit = mealUnit; save(); renderShopping(); return; }
     if (t.dataset.check) { state.checked[t.dataset.check] = t.checked; save(); renderShopping(); return; }
-    if (t.id === 'prog-ex') { state.progressEx = t.value; save(); renderProgress(); return; }
+    if (t.id === 'prog-type') {
+      const id = index.byName.get(L.normalizeName(t.value));
+      if (!id) { toast('No exercise called "' + t.value + '". Pick one from the suggestions.', 'err'); return; }
+      state.progressEx = id; save(); renderProgress(); return;
+    }
     if (t.id === 'cmp-a') { state.cmpA = t.value; save(); renderProgress(); return; }
     if (t.id === 'cmp-b') { state.cmpB = t.value; save(); renderProgress(); return; }
     if (t.dataset.file) {
