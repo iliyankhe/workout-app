@@ -671,7 +671,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.39';
+  const APP_VERSION = 'v1.40';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -980,6 +980,24 @@
     setInterval(drawTimer, 250);
   }
 
+  // Plans made in Claude are saved to workout_plans. When a plan this phone has not loaded yet is there, it replaces the current plan.
+  function loadLatestPlan() {
+    if (!SUPABASE || !index) return;
+    fetch(SUPABASE.url + '/rest/v1/workout_plans?select=id,plan&order=created_at.desc&limit=1', {
+      headers: { apikey: SUPABASE.key, Authorization: 'Bearer ' + SUPABASE.key },
+    }).then((r) => (r.ok ? r.json() : null)).then((rows) => {
+      if (!rows || !rows.length || rows[0].id === state.planId) return;
+      const r = L.validateWorkoutPlan(rows[0].plan, index);
+      if (!r.ok) return;
+      state.workoutPlan = r.plan;
+      state.planId = rows[0].id;
+      selectedDay = 0;
+      save();
+      render();
+      toast('New workout plan loaded.', 'ok');
+    }).catch(() => { /* offline: keep the plan on this phone */ });
+  }
+
   // ---- boot ----------------------------------------------------------------
   setupTimerBar();
   flushUploads();
@@ -988,6 +1006,7 @@
     .then((data) => {
       exercises = data;
       index = L.buildLibraryIndex(exercises);
+      loadLatestPlan();
       // First open with no workout plan: load the starter plan once. Plans already on the device are never replaced.
       if (!state.workoutPlan && !state.starterSeen) {
         fetch('data/starter_plan.json')
