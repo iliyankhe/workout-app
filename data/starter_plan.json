@@ -16,42 +16,48 @@
           "sets": 4,
           "reps": "6-8",
           "rest_sec": 120,
-          "notes": "Stop 1-2 reps short of failure"
+          "notes": "Stop 1-2 reps short of failure",
+          "target_lb": 65
         },
         {
           "exercise": "Incline Dumbbell Press",
           "sets": 3,
           "reps": "8-10",
           "rest_sec": 90,
-          "notes": ""
+          "notes": "",
+          "target_lb": 20
         },
         {
           "exercise": "Cable Crossover",
           "sets": 3,
           "reps": "12-15",
           "rest_sec": 60,
-          "notes": ""
+          "notes": "",
+          "target_lb": 20
         },
         {
           "exercise": "Dumbbell Shoulder Press",
           "sets": 3,
           "reps": "8-10",
           "rest_sec": 90,
-          "notes": ""
+          "notes": "",
+          "target_lb": 15
         },
         {
           "exercise": "Side Lateral Raise",
           "sets": 3,
           "reps": "12-15",
           "rest_sec": 60,
-          "notes": ""
+          "notes": "",
+          "target_lb": 8
         },
         {
           "exercise": "Triceps Pushdown - Rope Attachment",
           "sets": 3,
           "reps": "10-12",
           "rest_sec": 60,
-          "notes": ""
+          "notes": "",
+          "target_lb": 40
         }
       ]
     },
@@ -64,42 +70,48 @@
           "sets": 4,
           "reps": "8-10",
           "rest_sec": 90,
-          "notes": ""
+          "notes": "",
+          "target_lb": 60
         },
         {
           "exercise": "Seated Cable Rows",
           "sets": 3,
           "reps": "10-12",
           "rest_sec": 90,
-          "notes": ""
+          "notes": "",
+          "target_lb": 50
         },
         {
           "exercise": "Face Pull",
           "sets": 3,
           "reps": "12-15",
           "rest_sec": 60,
-          "notes": ""
+          "notes": "",
+          "target_lb": 25
         },
         {
           "exercise": "Straight-Arm Dumbbell Pullover",
           "sets": 2,
           "reps": "12",
           "rest_sec": 60,
-          "notes": ""
+          "notes": "",
+          "target_lb": 15
         },
         {
           "exercise": "Barbell Curl",
           "sets": 3,
           "reps": "8-10",
           "rest_sec": 60,
-          "notes": ""
+          "notes": "",
+          "target_lb": 45
         },
         {
           "exercise": "Hammer Curls",
           "sets": 2,
           "reps": "10-12",
           "rest_sec": 60,
-          "notes": ""
+          "notes": "",
+          "target_lb": 15
         }
       ]
     },
@@ -112,42 +124,48 @@
           "sets": 4,
           "reps": "10-12",
           "rest_sec": 120,
-          "notes": "Feet shoulder width"
+          "notes": "Feet shoulder width",
+          "target_lb": 120
         },
         {
           "exercise": "Romanian Deadlift",
           "sets": 3,
           "reps": "8-10",
           "rest_sec": 120,
-          "notes": ""
+          "notes": "",
+          "target_lb": 65
         },
         {
           "exercise": "Lying Leg Curls",
           "sets": 3,
           "reps": "10-12",
           "rest_sec": 90,
-          "notes": ""
+          "notes": "",
+          "target_lb": 40
         },
         {
           "exercise": "Leg Extensions",
           "sets": 3,
           "reps": "12-15",
           "rest_sec": 60,
-          "notes": ""
+          "notes": "",
+          "target_lb": 45
         },
         {
           "exercise": "Barbell Hip Thrust",
           "sets": 3,
           "reps": "8-10",
           "rest_sec": 90,
-          "notes": ""
+          "notes": "",
+          "target_lb": 65
         },
         {
           "exercise": "Seated Calf Raise",
           "sets": 3,
           "reps": "12-15",
           "rest_sec": 60,
-          "notes": "Slow reps, pause at the bottom"
+          "notes": "Slow reps, pause at the bottom",
+          "target_lb": 60
         }
       ]
     }
