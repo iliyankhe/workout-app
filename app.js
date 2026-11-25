@@ -671,7 +671,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.37';
+  const APP_VERSION = 'v1.38';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -697,7 +697,7 @@
           '<span>' + esc(l.date) + ' · ' + esc(l.day) + ' · ' + sets + ' sets</span>' +
           '<button class="bad" style="color:var(--bad)" data-del-log="' + i + '">Delete</button></div>';
       }).join('');
-    return '<h2>Saved workouts</h2><div class="card"><p class="muted">Delete one workout at a time, or use Clear saved workouts below.</p>' + rows + '</div>';
+    return '<h2>Saved workouts</h2><div class="card"><p class="muted">Delete one workout at a time.</p>' + rows + '</div>';
   }
 
   function renderData() {
@@ -725,7 +725,7 @@
       '<p class="muted">Save a backup file to iCloud Drive from the share sheet (Save to Files).</p>' +
       '<div class="row"><button class="primary" data-backup="export">Export backup</button>' +
       '<label class="btn" style="margin:0">Restore backup<input type="file" accept="application/json,.json" data-file="backup" hidden></label></div>' +
-      '<div class="row" style="margin-top:12px"><button data-backup="clear-logs">Clear saved workouts</button>' +
+      '<div class="row" style="margin-top:12px">' +
       '<button class="bad" style="color:var(--bad)" data-backup="clear">Erase all data on this phone</button></div></div>' +
       '<div id="backup-box"></div><div id="import-msgs"></div>';
   }
@@ -860,13 +860,6 @@
       const log = state.logs[Number(t.dataset.delLog)];
       if (log && confirm('Delete the ' + log.day + ' workout from ' + log.date + '? This cannot be undone.')) {
         state.logs.splice(Number(t.dataset.delLog), 1); save(); render(); toast('Workout deleted.', 'ok');
-      }
-      return;
-    }
-    if (t.dataset.backup === 'clear-logs') {
-      // Removes saved workouts and in-progress entries only. Plans, meals and the pantry stay.
-      if (confirm('Delete all saved workouts on this phone? Your plans and meals stay. Export a backup first if you want to keep them.')) {
-        state.logs = []; state.drafts = {}; save(); render(); toast('Saved workouts cleared.', 'ok');
       }
       return;
     }
