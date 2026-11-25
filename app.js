@@ -671,7 +671,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.38';
+  const APP_VERSION = 'v1.39';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -725,8 +725,7 @@
       '<p class="muted">Save a backup file to iCloud Drive from the share sheet (Save to Files).</p>' +
       '<div class="row"><button class="primary" data-backup="export">Export backup</button>' +
       '<label class="btn" style="margin:0">Restore backup<input type="file" accept="application/json,.json" data-file="backup" hidden></label></div>' +
-      '<div class="row" style="margin-top:12px">' +
-      '<button class="bad" style="color:var(--bad)" data-backup="clear">Erase all data on this phone</button></div></div>' +
+      '</div>' +
       '<div id="backup-box"></div><div id="import-msgs"></div>';
   }
 
@@ -860,12 +859,6 @@
       const log = state.logs[Number(t.dataset.delLog)];
       if (log && confirm('Delete the ' + log.day + ' workout from ' + log.date + '? This cannot be undone.')) {
         state.logs.splice(Number(t.dataset.delLog), 1); save(); render(); toast('Workout deleted.', 'ok');
-      }
-      return;
-    }
-    if (t.dataset.backup === 'clear') {
-      if (confirm('Erase all plans, logs and pantry on this phone? Export a backup first.')) {
-        state = blank(); save(); render(); toast('All data erased.', 'ok');
       }
       return;
     }
