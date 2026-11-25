@@ -360,6 +360,28 @@
   }
 
   // Progress ----------------------------------------------------------------
+  // Exercises you have logged, in the order they were first logged.
+  function loggedExerciseIds() {
+    return [...new Set(state.logs.flatMap((l) => l.entries.map((e) => e.exercise_id)))];
+  }
+
+  // Options for the Progress dropdown. Empty text lists logged exercises; typed text lists library exercises
+  // whose names start with it, logged ones first. The selected exercise always stays in the list.
+  function progressOptions(text, selected) {
+    const logged = loggedExerciseIds();
+    const q = L.normalizeName(text);
+    let list;
+    if (!q) {
+      list = logged;
+    } else {
+      const matches = exercises.filter((e) => L.normalizeName(e.name).startsWith(q)).map((e) => e.id);
+      list = matches.sort((a, b) => (logged.includes(b) ? 1 : 0) - (logged.includes(a) ? 1 : 0)).slice(0, 80);
+    }
+    if (selected && !list.includes(selected) && (!q || logged.includes(selected))) list = [selected].concat(list);
+    if (!list.length) return '<option disabled>No exercise starts with "' + esc(text) + '"</option>';
+    return list.map((id) => '<option value="' + esc(id) + '"' + (id === selected ? ' selected' : '') + '>' + esc(exName(id)) + '</option>').join('');
+  }
+
   function renderProgress() {
     const ids = [...new Set(state.logs.flatMap((l) => l.entries.map((e) => e.exercise_id)))];
     if (!ids.length) {
@@ -369,13 +391,11 @@
     const selected = state.progressEx && index.byId.has(state.progressEx) ? state.progressEx : ids[0];
     const rows = L.exerciseHistory(state.logs, selected);
     const maxW = Math.max(1, ...rows.map((r) => r.topWeight));
-    // Dropdown lists the exercises you have logged. The typing box finds any exercise in the library.
-    const listed = ids.includes(selected) ? ids : [selected].concat(ids);
-    let html = '<label>Pick a logged exercise</label>' +
-      '<select id="prog-ex">' + listed.map((id) => '<option value="' + esc(id) + '"' + (id === selected ? ' selected' : '') + '>' + esc(exName(id)) + '</option>').join('') + '</select>' +
-      '<label>Or type any exercise</label>' +
-      '<input id="prog-type" list="prog-names" placeholder="e.g. Bench Press">' +
-      '<datalist id="prog-names">' + exercises.map((e) => '<option value="' + esc(e.name) + '">').join('') + '</datalist>';
+    // Typing narrows the dropdown to exercises whose names start with what you type. Empty box = your logged exercises.
+    let html = '<label>Type to find an exercise</label>' +
+      '<input id="prog-type" placeholder="e.g. Bar" autocomplete="off">' +
+      '<label>Exercise</label>' +
+      '<select id="prog-ex">' + progressOptions('', selected) + '</select>';
     html += '<h2>Weight lifted over time</h2><div class="card">';
     if (!rows.length) html += '<p class="muted">No saved sets for this exercise yet.</p>';
     rows.forEach((r, i) => {
@@ -616,7 +636,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v32';
+  const APP_VERSION = 'v33';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -835,11 +855,6 @@
     if (t.id === 'shop-unit') { mealUnit = t.value; state.mealUnit = mealUnit; save(); renderShopping(); return; }
     if (t.dataset.check) { state.checked[t.dataset.check] = t.checked; save(); renderShopping(); return; }
     if (t.id === 'prog-ex') { state.progressEx = t.value; save(); renderProgress(); return; }
-    if (t.id === 'prog-type') {
-      const id = index.byName.get(L.normalizeName(t.value));
-      if (!id) { toast('No exercise called "' + t.value + '". Pick one from the suggestions.', 'err'); return; }
-      state.progressEx = id; save(); renderProgress(); return;
-    }
     if (t.id === 'cmp-a') { state.cmpA = t.value; save(); renderProgress(); return; }
     if (t.id === 'cmp-b') { state.cmpB = t.value; save(); renderProgress(); return; }
     if (t.dataset.file) {
@@ -863,6 +878,11 @@
 
   view.addEventListener('input', (ev) => {
     const el = ev.target;
+    if (el.id === 'prog-type') {
+      const sel = document.getElementById('prog-ex');
+      if (sel) sel.innerHTML = progressOptions(el.value, state.progressEx);
+      return;
+    }
     if (el.dataset && el.dataset.f && el.dataset.ex && state.workoutPlan) {
       draftFor(state.workoutPlan.days[selectedDay].title)[el.dataset.ex + '|' + el.dataset.set + '|' + el.dataset.f] = el.value;
       save();
