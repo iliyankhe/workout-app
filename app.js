@@ -588,6 +588,9 @@
   }
 
   // Import & backup --------------------------------------------------------
+  // Shown on the Import tab so you can tell which version of the app your phone has loaded.
+  const APP_VERSION = 'v25';
+
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
     'For exercises, use names exactly as they appear in the attached exercise-names.txt list.',
@@ -601,6 +604,7 @@
 
   function renderData() {
     view.innerHTML =
+      '<p class="muted" style="font-size:12px">App version ' + APP_VERSION + '</p>' +
       '<h2>Import workout plan</h2><div class="card">' +
       '<textarea id="wp-text" placeholder="Paste workout plan JSON here"></textarea>' +
       '<input type="file" accept="application/json,.json" data-file="workout" style="margin-top:8px">' +
