@@ -405,12 +405,26 @@
   // The muscle last tapped on the figure, with its tap point. Kept across re-renders.
   let bodySelected = null;
 
+  // Days since the last logged workout, and how many muscle groups are fresh (not sore today).
+  function recoveryStats(sore) {
+    const dates = state.logs.filter((l) => (l.entries || []).length > 0).map((l) => l.date).sort();
+    const last = dates[dates.length - 1];
+    const days = last ? Math.max(0, Math.round((Date.parse(todayISO() + 'T00:00:00Z') - Date.parse(last + 'T00:00:00Z')) / 86400000)) : null;
+    const groups = Object.keys(REGION_INFO);
+    const fresh = groups.filter((r) => !(sore[r] && sore[r].level > 0)).length;
+    return '<div class="card stats">' +
+      '<div><div class="stat-num">' + (days == null ? '–' : days) + '</div><div class="stat-label">Days since your last workout</div></div>' +
+      '<div><div class="stat-num">' + fresh + '</div><div class="stat-label">Fresh muscle groups of ' + groups.length + '</div></div>' +
+      '</div>';
+  }
+
   function renderBody() {
     const load = L.weeklyLoad(state.logs, exercises, todayISO(), 7);
     const sore = soreByRegion();
     const chip = (k, label) => '<button class="chip ' + (bodyMode === k ? 'on' : '') + '" data-bodymode="' + k + '">' + label + '</button>';
     view.innerHTML =
       '<div class="row" style="margin-bottom:8px">' + chip('figure', 'Figure') + chip('heat', 'Training') + chip('sore', 'Soreness') + '</div>' +
+      recoveryStats(sore) +
       '<div class="card" style="padding:6px;position:relative"><div id="body-canvas" style="height:440px;touch-action:none"></div>' +
       '<div id="body-dot" class="body-dot" hidden></div><div id="body-label" class="body-label" hidden></div></div>' +
       '<div id="body-menu"></div>' +

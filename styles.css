@@ -85,3 +85,7 @@ td.num, th.num { text-align: right; }
 .card.warn { border-color: #6b5a2a; background: #2a2416; }
 
 .body-dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #f2f2f7; box-shadow: 0 0 0 3px rgba(242,242,247,.25); pointer-events: none; }
+
+.stats { display: flex; justify-content: space-around; text-align: center; padding: 14px 8px; }
+.stat-num { font-size: 36px; font-weight: 700; font-style: italic; line-height: 1.1; }
+.stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; color: #9a9bab; max-width: 150px; margin: 4px auto 0; }
