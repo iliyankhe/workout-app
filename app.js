@@ -135,7 +135,7 @@
     return '<div class="card exercise">' +
       '<h3>' + (i + 1) + '. ' + esc(broken ? ex.exercise_id : e.name) + '</h3>' +
       '<div class="meta">' + esc(ex.sets) + ' sets × ' + esc(ex.reps || '?') + ' reps' +
-      (ex.rest_sec ? ' · rest ' + esc(ex.rest_sec) + 's' : '') + '</div>' +
+      (ex.rest_sec ? ' · rest ' + esc(ex.rest_sec) + 's' : '') + (ex.target_lb != null ? ' · target ' + esc(ex.target_lb) + ' lb' : '') + '</div>' +
       (ex.notes ? '<div class="meta">' + esc(ex.notes) + '</div>' : '') +
       '<div style="margin:8px 0">' + (e ? animHTML(e) : '') + '</div>' +
       '<div>' + muscles + '</div>' +
@@ -184,6 +184,8 @@
         '<label class="check" style="margin:0 0 8px"><input type="checkbox" data-stretch="' + esc(key) + '" ' + (done ? 'checked' : '') + '>' +
         '<h3 style="margin:0">' + (i + 1) + '. ' + esc(p.exercise.name) + '</h3></label>' +
         '<div class="meta">' + (isWarm ? '' : esc(p.muscle) + ' · ') + esc(meta) + '</div>' +
+        '<div class="row" style="margin:6px 0"><button class="chip" data-timer="' + (isWarm ? (p.minutes ? p.minutes * 60 : 30) : cfg.hold_sec) +
+        '" data-label="' + esc(p.exercise.name) + (isWarm ? '' : ' hold') + '">Timer ' + esc(isWarm ? (p.minutes ? p.minutes + ' min' : '30 s') : cfg.hold_sec + ' s') + '</button></div>' +
         '<div style="margin:8px 0">' + animHTML(p.exercise) + '</div>' +
         (p.exercise.instructions && p.exercise.instructions.length
           ? '<details><summary>How to do it</summary><ol>' + p.exercise.instructions.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol></details>'
@@ -213,12 +215,15 @@
       for (let s = 0; s < ex.sets; s++) {
         const key = ex.exercise_id + '|' + s;
         const repsV = d[key + '|reps'] != null ? d[key + '|reps'] : (parseInt(ex.reps, 10) || '');
-        const wV = d[key + '|weight_lb'] != null ? d[key + '|weight_lb'] : w;
+        const wV = d[key + '|weight_lb'] != null ? d[key + '|weight_lb'] : (ex.target_lb != null ? ex.target_lb : w);
+        const rest = ex.rest_sec || 90;
         sets.push('<tr><td>Set ' + (s + 1) + '</td>' +
           '<td><input class="num" inputmode="numeric" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="reps" value="' + esc(repsV) + '" placeholder="reps"></td>' +
-          '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(wV) + '" placeholder="lb"></td></tr>');
+          '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(wV) + '" placeholder="lb"></td>' +
+          '<td><button class="chip" data-timer="' + rest + '" data-label="' + esc(exName(ex.exercise_id)) + ' rest">Rest ' + esc(rest) + 's</button></td></tr>');
       }
       return '<h3 style="margin-top:12px">' + esc(exName(ex.exercise_id)) + '</h3>' +
+        '<div class="row" style="margin-bottom:6px"><span class="muted">Target</span><input class="num" inputmode="decimal" data-target="' + esc(ex.exercise_id) + '" value="' + esc(ex.target_lb != null ? ex.target_lb : '') + '" placeholder="lb"></div>' +
         '<div class="row" style="margin-bottom:6px"><button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="-5">−5 lb</button>' +
         '<button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="5">+5 lb</button>' +
         '<span class="muted" style="font-size:12px">all sets of this lift</span></div>' +
@@ -664,6 +669,7 @@
     if (t.id === 'save-session') { saveSession(Number(t.dataset.day)); return; }
     if (t.dataset.replace != null) { swapOpen = { day: selectedDay, idx: Number(t.dataset.replace) }; render(); return; }
     if (t.dataset.cancelSwap != null) { swapOpen = null; render(); return; }
+    if (t.dataset.timer) { startTimer(t.dataset.label || 'Timer', Number(t.dataset.timer)); return; }
     if (t.dataset.adjust) {
       // Moves the weight of every set of this lift by the step, and saves it.
       const day = state.workoutPlan.days[selectedDay];
@@ -747,6 +753,12 @@
 
   view.addEventListener('change', (ev) => {
     const t = ev.target;
+    if (t.dataset.target) {
+      const day = state.workoutPlan.days[selectedDay];
+      const ex = day.exercises.find((x) => x.exercise_id === t.dataset.target);
+      if (ex) { if (t.value === '') delete ex.target_lb; else ex.target_lb = Number(t.value); save(); }
+      return;
+    }
     if (t.dataset.stretch) {
       doneStretch[t.dataset.stretch] = t.checked;
       draftFor(t.dataset.stretch.split('|')[0])['stretch|' + t.dataset.stretch] = t.checked;
@@ -801,7 +813,42 @@
     }
   });
 
+  // ---- Timers: one at a time, shown above the tabs so they keep running while you move around the app ----
+  let timer = null; // { label, endAt, total }
+  function fmtTime(sec) { return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+  function startTimer(label, sec) { timer = { label, endAt: Date.now() + sec * 1000, total: sec }; drawTimer(); }
+  function drawTimer() {
+    const bar = document.getElementById('timer-bar');
+    if (!bar) return;
+    if (!timer) { bar.hidden = true; return; }
+    const left = Math.max(0, Math.ceil((timer.endAt - Date.now()) / 1000));
+    if (left === 0) {
+      const done = timer.label;
+      timer = null;
+      bar.hidden = true;
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+      toast('Done: ' + done, 'ok');
+      return;
+    }
+    bar.hidden = false;
+    document.getElementById('timer-label').textContent = timer.label;
+    document.getElementById('timer-time').textContent = fmtTime(left);
+  }
+  function setupTimerBar() {
+    const bar = document.createElement('div');
+    bar.id = 'timer-bar';
+    bar.className = 'timer-bar';
+    bar.hidden = true;
+    bar.innerHTML = '<span id="timer-label"></span><strong id="timer-time"></strong>' +
+      '<button id="timer-add">+15 s</button><button id="timer-stop">Stop</button>';
+    document.body.appendChild(bar);
+    document.getElementById('timer-add').addEventListener('click', () => { if (timer) { timer.endAt += 15000; drawTimer(); } });
+    document.getElementById('timer-stop').addEventListener('click', () => { timer = null; drawTimer(); });
+    setInterval(drawTimer, 250);
+  }
+
   // ---- boot ----------------------------------------------------------------
+  setupTimerBar();
   fetch('data/exercises.json')
     .then((r) => r.json())
     .then((data) => {
