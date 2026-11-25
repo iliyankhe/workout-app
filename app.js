@@ -95,6 +95,8 @@
       });
       html += '</div>';
       const day = plan.days[selectedDay];
+      const dd = (state.drafts || {})[day.title] || {};
+      for (const k of Object.keys(dd)) if (k.startsWith('stretch|')) doneStretch[k.slice(8)] = dd[k];
       html += '<h2>' + esc(day.title || 'Today') + '</h2>';
       html += stretchSection('warmup', day, plan.cooldown || {});
       html += '<h2>Lifts</h2>';
@@ -196,19 +198,35 @@
     return rows.length ? rows[rows.length - 1].topWeight : '';
   }
 
+  // Session drafts: every set value and stretch tick is saved as it changes, so nothing is lost if the page closes.
+  function draftFor(title) {
+    state.drafts = state.drafts || {};
+    if (!state.drafts[title]) state.drafts[title] = {};
+    return state.drafts[title];
+  }
+
   function logSession(day) {
+    const d = (state.drafts || {})[day.title] || {};
     const rows = day.exercises.map((ex) => {
       const sets = [];
       const w = lastWeightFor(ex.exercise_id);
       for (let s = 0; s < ex.sets; s++) {
+        const key = ex.exercise_id + '|' + s;
+        const repsV = d[key + '|reps'] != null ? d[key + '|reps'] : (parseInt(ex.reps, 10) || '');
+        const wV = d[key + '|weight_lb'] != null ? d[key + '|weight_lb'] : w;
         sets.push('<tr><td>Set ' + (s + 1) + '</td>' +
-          '<td><input class="num" inputmode="numeric" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="reps" value="' + esc(parseInt(ex.reps, 10) || '') + '" placeholder="reps"></td>' +
-          '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(w) + '" placeholder="lb"></td></tr>');
+          '<td><input class="num" inputmode="numeric" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="reps" value="' + esc(repsV) + '" placeholder="reps"></td>' +
+          '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(wV) + '" placeholder="lb"></td></tr>');
       }
-      return '<h3 style="margin-top:12px">' + esc(exName(ex.exercise_id)) + '</h3><table><tbody>' + sets.join('') + '</tbody></table>';
+      return '<h3 style="margin-top:12px">' + esc(exName(ex.exercise_id)) + '</h3>' +
+        '<div class="row" style="margin-bottom:6px"><button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="-5">−5 lb</button>' +
+        '<button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="5">+5 lb</button>' +
+        '<span class="muted" style="font-size:12px">all sets of this lift</span></div>' +
+        '<table><tbody>' + sets.join('') + '</tbody></table>';
     }).join('');
     return '<h2>Log this workout</h2><div class="card">' +
-      '<label>Date</label><input type="date" id="log-date" value="' + todayISO() + '">' +
+      '<label>Date</label><input type="date" id="log-date" value="' + esc(d.__date || todayISO()) + '">' +
+      '<p class="muted" style="font-size:12px">Each entry is saved as you type, so nothing is lost if the page closes.</p>' +
       rows +
       '<div class="row" style="margin-top:12px"><button class="primary" id="save-session" data-day="' + selectedDay + '">Save workout</button></div>' +
       '</div>';
@@ -235,6 +253,7 @@
     // Replace an earlier save for the same date and day, so re-saving does not duplicate.
     state.logs = state.logs.filter((l) => !(l.date === date && l.day === day.title));
     state.logs.push({ date, day: day.title, entries, warmup, cooldown });
+    if (state.drafts) delete state.drafts[day.title];
     save();
     Object.keys(doneStretch).forEach((k) => { if (k.startsWith(prefix)) delete doneStretch[k]; });
     toast('Saved ' + date + ' workout.', 'ok');
@@ -645,6 +664,22 @@
     if (t.id === 'save-session') { saveSession(Number(t.dataset.day)); return; }
     if (t.dataset.replace != null) { swapOpen = { day: selectedDay, idx: Number(t.dataset.replace) }; render(); return; }
     if (t.dataset.cancelSwap != null) { swapOpen = null; render(); return; }
+    if (t.dataset.adjust) {
+      // Moves the weight of every set of this lift by the step, and saves it.
+      const day = state.workoutPlan.days[selectedDay];
+      const id = t.dataset.adjust;
+      const ex = day.exercises.find((x) => x.exercise_id === id);
+      const d = draftFor(day.title);
+      for (let s = 0; ex && s < ex.sets; s++) {
+        const wt = view.querySelector('[data-ex="' + id + '"][data-set="' + s + '"][data-f="weight_lb"]');
+        if (!wt) continue;
+        const next = Math.max(0, (Number(wt.value) || 0) + Number(t.dataset.step));
+        wt.value = String(next);
+        d[id + '|' + s + '|weight_lb'] = String(next);
+      }
+      save();
+      return;
+    }
     if (t.dataset.swapTo) {
       // Changes the planned exercise for this day. Earlier logs keep the exercise they were logged with.
       const day = state.workoutPlan.days[selectedDay];
@@ -714,6 +749,8 @@
     const t = ev.target;
     if (t.dataset.stretch) {
       doneStretch[t.dataset.stretch] = t.checked;
+      draftFor(t.dataset.stretch.split('|')[0])['stretch|' + t.dataset.stretch] = t.checked;
+      save();
       const card = t.closest('.card');
       if (card) card.classList.toggle('done', t.checked);
       return;
@@ -744,6 +781,17 @@
   });
 
   view.addEventListener('input', (ev) => {
+    const el = ev.target;
+    if (el.dataset && el.dataset.f && el.dataset.ex && state.workoutPlan) {
+      draftFor(state.workoutPlan.days[selectedDay].title)[el.dataset.ex + '|' + el.dataset.set + '|' + el.dataset.f] = el.value;
+      save();
+      return;
+    }
+    if (el.id === 'log-date' && state.workoutPlan) {
+      draftFor(state.workoutPlan.days[selectedDay].title).__date = el.value;
+      save();
+      return;
+    }
     if (ev.target.id === 'lib-search') {
       const pos = ev.target.selectionStart;
       search = ev.target.value;
