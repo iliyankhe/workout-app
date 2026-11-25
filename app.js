@@ -349,6 +349,34 @@
     quads: 'Quads', hamstrings: 'Hamstrings', glutes: 'Glutes', adductors: 'Inner thigh', calves: 'Calves',
     lats: 'Lats', obliques: 'Obliques', upper_back: 'Upper back', lower_back: 'Lower back', neck: 'Neck',
   };
+  // What each muscle group covers, what it does, and what trains it. Shown in the muscle's panel and in the guide.
+  const REGION_INFO = {
+    chest: { muscles: 'Pectoralis major (upper, middle and lower fibres) and pectoralis minor', does: 'Pulls the upper arm across the body and in front, and pushes forward.', trained: 'Bench press, push-ups, cable flyes' },
+    shoulders: { muscles: 'Deltoids: front, side and rear heads, over the top of the shoulder joint', does: 'Raises the arm forward, out to the side and back, and steadies the shoulder.', trained: 'Overhead press, lateral raises, rear delt flyes' },
+    upper_back: { muscles: 'Trapezius (upper and middle) and rhomboids, between the shoulder blades and up the neck', does: 'Moves and holds the shoulder blades, and helps with posture.', trained: 'Rows, face pulls, shrugs' },
+    lats: { muscles: 'Latissimus dorsi, the broad muscles of the back from the spine to the upper arm', does: 'Pulls the arm down and back, and draws the shoulder blade down.', trained: 'Pull-ups, lat pulldowns, rows' },
+    lower_back: { muscles: 'Erector spinae, the muscles running either side of the spine', does: 'Keeps the spine upright and extends the back.', trained: 'Deadlifts, back extensions, good mornings' },
+    abs: { muscles: 'Rectus abdominis (the front of the belly, upper and lower)', does: 'Bends the trunk forward and stabilises the core.', trained: 'Crunches, leg raises, planks' },
+    obliques: { muscles: 'External and internal obliques, along the sides of the waist', does: 'Rotates and side-bends the trunk.', trained: 'Side bends, Russian twists, cable chops' },
+    biceps: { muscles: 'Biceps brachii, the front of the upper arm', does: 'Bends the elbow and turns the palm up.', trained: 'Curls, chin-ups, hammer curls' },
+    triceps: { muscles: 'Triceps brachii, the back of the upper arm (three heads)', does: 'Straightens the elbow.', trained: 'Pushdowns, dips, skull crushers' },
+    forearms: { muscles: 'Flexors and extensors of the wrist and fingers', does: 'Bends and straightens the wrist, and grips.', trained: 'Wrist curls, farmer carries, dead hangs' },
+    glutes: { muscles: 'Gluteus maximus, medius and minimus (the buttocks and hip sides)', does: 'Extends and rotates the hip, and steadies the pelvis.', trained: 'Squats, hip thrusts, lunges, abductions' },
+    quads: { muscles: 'Quadriceps: rectus femoris and three vastus muscles, the front of the thigh', does: 'Straightens the knee and flexes the hip.', trained: 'Squats, leg press, leg extensions' },
+    hamstrings: { muscles: 'Biceps femoris, semitendinosus and semimembranosus, the back of the thigh', does: 'Bends the knee and extends the hip.', trained: 'Romanian deadlifts, leg curls' },
+    adductors: { muscles: 'Adductor longus, brevis and magnus, the inner thigh', does: 'Pulls the legs together.', trained: 'Adductor machine, sumo squats, copenhagen planks' },
+    calves: { muscles: 'Gastrocnemius (the big calf muscle) and soleus, below the knee', does: 'Points the foot down and helps with walking and jumping.', trained: 'Standing and seated calf raises' },
+    neck: { muscles: 'Sternocleidomastoid and the neck extensors and flexors', does: 'Moves and holds the head.', trained: 'Neck flexion and extension (light, controlled)' },
+  };
+
+  function regionInfoHTML(region) {
+    const info = REGION_INFO[region];
+    if (!info) return '';
+    return '<p class="muted" style="margin-top:8px"><strong>Muscles:</strong> ' + esc(info.muscles) + '.<br>' +
+      '<strong>What it does:</strong> ' + esc(info.does) + '<br>' +
+      '<strong>Trained by:</strong> ' + esc(info.trained) + '.</p>';
+  }
+
   let bodyMounted = false;
 
   // Soreness today: the estimate from completed workouts, replaced by anything entered by hand.
@@ -387,6 +415,9 @@
       '<div id="body-dot" class="body-dot" hidden></div><div id="body-label" class="body-label" hidden></div></div>' +
       '<div id="body-menu"></div>' +
       '<div id="body-panel"></div>' +
+      '<details class="card"><summary><strong>Muscle guide</strong></summary>' +
+      Object.keys(REGION_INFO).map((r) => '<div style="margin-top:10px"><strong>' + esc(REGION_NAMES[r] || r) + '</strong>' + regionInfoHTML(r) + '</div>').join('') +
+      '</details>' +
       '<p class="muted">Drag to turn the figure. Tap a muscle to see its sets or log soreness. Tap it again, or tap away from the body, to clear. This is a stylised figure, not medical imaging. If pain is sharp, lasts, or gets worse, see a doctor or physiotherapist.</p>';
     window.BodyMap.render(document.getElementById('body-canvas'), {
       mode: bodyMode === 'figure' ? 'plain' : bodyMode, load, sore,
@@ -483,7 +514,7 @@
     if (!panel) return;
     const manual = ((state.soreness || {})[todayISO()] || {})[region];
     panel.innerHTML = '<div class="card"><h3>' + esc(REGION_NAMES[region] || region) + '</h3>' +
-      bodyLegend() +
+      bodyLegend() + regionInfoHTML(region) +
       '<p class="muted">Sets in the last 7 days: ' + (load[region] || 0) + '</p>' +
       '<p class="muted">Soreness today: ' + levels[level] + (sore[region] && sore[region].source === 'manual' ? ' (entered by you)' : ' (estimated)') + '</p>' +
       soreChips(region, manual) + '</div>';
