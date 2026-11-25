@@ -11,6 +11,11 @@ import trimesh
 DT = {5120: np.int8, 5121: np.uint8, 5122: np.int16, 5123: np.uint16, 5125: np.uint32, 5126: np.float32}
 NC = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4, 'MAT4': 16}
 DROP_MATERIALS = ('MI_Hair', 'MI_Eyes')
+# How far (metres) each muscle group is pushed out along its surface, so it stands out. Scaled by --bulge.
+BULGE = {'chest': 0.018, 'shoulders': 0.014, 'biceps': 0.016, 'triceps': 0.013, 'forearms': 0.006,
+         'abs': 0.009, 'obliques': 0.008, 'lats': 0.010, 'upper_back': 0.006, 'lower_back': 0.006,
+         'glutes': 0.012, 'quads': 0.017, 'hamstrings': 0.013, 'adductors': 0.008, 'calves': 0.015,
+         'neck': 0.0, 'skin': 0.0}
 
 def load(path):
     base = os.path.dirname(path)
@@ -208,6 +213,19 @@ def taubin(Q, idx, n, iters=6, lam=0.5, mu=-0.53):
         X = X + mu * (An @ X - X)
     return X
 
+def smooth_values(v, idx, n, iters=8):
+    """Averages a per-vertex value over neighbours, so a bulge fades out smoothly at region borders."""
+    import scipy.sparse as sp
+    e = np.concatenate([idx[:, [0, 1]], idx[:, [1, 2]], idx[:, [2, 0]]])
+    A = sp.coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(n, n))
+    A = ((A + A.T) > 0).astype(float).tocsr()
+    deg = np.asarray(A.sum(axis=1)).ravel(); deg[deg == 0] = 1
+    An = sp.diags(1.0 / deg) @ A
+    x = v.astype(float).copy()
+    for _ in range(iters):
+        x = 0.5 * x + 0.5 * (An @ x)
+    return x
+
 def seams_of(Q, idx, tri_reg, nrm, iters=15, lift=0.002):
     """Smooth line segments along edges shared by two triangles of different muscle regions."""
     import scipy.sparse as sp
@@ -248,6 +266,7 @@ def main():
     ap.add_argument('--pose', type=int, default=1)
     ap.add_argument('--arm-angle', type=float, default=45.0)
     ap.add_argument('--smooth-surface', type=int, default=6)
+    ap.add_argument('--bulge', type=float, default=1.0)
     args = ap.parse_args()
     j, bufs = load(args.src)
     skel = j['skins'][0]
@@ -306,6 +325,10 @@ def main():
         vreg = np.array([region_of(bone_names[d], Qr[i], args.height, ZC.get(d, 0.0)) for i, d in enumerate(dom)])
         vreg = smooth_labels(vreg, idx, len(Qg), iters=args.smooth)
         Qs = taubin(Qg, idx, len(Qg), iters=args.smooth_surface) if args.smooth_surface else Qg
+        if args.bulge:
+            nb = np.asarray(trimesh.Trimesh(vertices=Qs, faces=idx, process=False).vertex_normals)
+            amt = smooth_values(np.array([BULGE.get(r, 0.0) for r in vreg]), idx, len(Qs), iters=40)
+            Qs = taubin(Qs + nb * (amt[:, None] * args.bulge), idx, len(Qs), iters=8)
         Q = shape(Qs, vreg, args.height) if args.shape else Qs
         tri = vreg[idx]
         tri_reg = np.where(tri[:, 1] == tri[:, 2], tri[:, 1], tri[:, 0])
