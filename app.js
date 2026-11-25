@@ -636,7 +636,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v33';
+  const APP_VERSION = 'v1.33';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
