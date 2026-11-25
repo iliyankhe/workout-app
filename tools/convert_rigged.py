@@ -104,9 +104,26 @@ def arm_pose(world, parent, names, side_bias=0.2):
             if under(parent, i, up): W[i] = D1 @ world[i]
         pl2 = (D1 @ np.append(pl, 1))[:3]; ph2 = (D1 @ np.append(ph, 1))[:3]
         D2 = about(rot_between(ph2 - pl2, np.array([sx * 0.05, -1.0, 0.0])), pl2)
+        # Anatomical position: roll the forearm so the thumb points outward, which turns the palm forward.
+        k = (ph2 - pl2) / np.linalg.norm(ph2 - pl2)
+        # The hand continues the line of the forearm (straight wrist).
+        mid = (D2 @ D1 @ np.append(world[names[f'middle_01_{side}']][:3, 3], 1))[:3]
+        D4 = about(rot_between(mid - ph2, k), ph2)
+        # Roll the forearm so the thumb points outward, which turns the palm forward.
+        thumb = (D4 @ D2 @ D1 @ np.append(world[names[f'thumb_01_{side}']][:3, 3], 1))[:3]
+        t = thumb - ph2; t = t - np.dot(t, k) * k
+        u = np.array([sx, 0.0, 0.0]); u = u - np.dot(u, k) * k
+        theta = np.arctan2(np.dot(k, np.cross(t, u)), np.dot(t, u))
+        D3 = about(rodrigues(k, theta), pl2)
         for i in range(len(W)):
-            if under(parent, i, lo): W[i] = D2 @ D1 @ world[i]
+            if under(parent, i, ha): W[i] = D3 @ D4 @ D2 @ D1 @ world[i]
+            elif under(parent, i, lo): W[i] = D3 @ D2 @ D1 @ world[i]
     return W
+
+def rodrigues(k, theta):
+    """3x3 rotation by theta about the unit axis k."""
+    K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + np.sin(theta) * K + (1 - np.cos(theta)) * (K @ K)
 
 def skin_points(P, J, Wt, SM):
     """Linear blend skinning: move rest-pose points with their four bone weights."""
@@ -318,7 +335,7 @@ def main():
         f.write(seam_pos.astype(np.float32).ravel().tobytes())
     meta = {'format': 'v4', 'totalVertices': total, 'normalsOffset': total * 12, 'shadeOffset': total * 24,
             'uvOffset': total * 28, 'indexOffset': total * 36, 'groups': meta_groups, 'units': 'meters',
-            'upAxis': 'y', 'frontAxis': '+z', 'height': args.height, 'pose': 'arms relaxed at sides' if args.pose else 'rest',
+            'upAxis': 'y', 'frontAxis': '+z', 'height': args.height, 'pose': 'anatomical position' if args.pose else 'rest',
             'seamSegments': int(len(seam_pos)),
             'source': 'Universal Base Characters by Quaternius (CC0), converted by convert_rigged.py'}
     json.dump(meta, open(os.path.join(args.out, 'body.json'), 'w'), indent=1)
