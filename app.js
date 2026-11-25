@@ -15,7 +15,7 @@
   let mealUnit = state.mealUnit || 'g';
   let search = '';
   let doneStretch = {}; // { 'dayTitle|kind|exercise_id': true } for the current session, cleared on save
-  let bodyMode = 'figure';
+  let bodyMode = 'sore';
 
   // ---- helpers -------------------------------------------------------------
   function esc(s) {
@@ -108,7 +108,7 @@
 
   // Asks about soreness before training any muscle that is at least moderately sore.
   function soreCheck(day) {
-    const sore = soreByRegion();
+    const sore = soreByRegion(true);
     const today = todayISO();
     const manual = (state.soreness || {})[today] || {};
     const due = dayRegions(day).filter((r) => sore[r] && sore[r].level >= 2);
@@ -442,9 +442,11 @@
 
   // Soreness today: the estimate from completed workouts, replaced by anything entered by hand.
   // A manual 0 clears the estimate for that muscle.
-  function soreByRegion() {
+  // excludeToday: used before training, so the workout you are about to do does not count as soreness.
+  function soreByRegion(excludeToday) {
     const today = todayISO();
-    const sore = L.autoSoreness(state.logs, exercises, today);
+    const logs = excludeToday ? state.logs.filter((l) => l.date !== today) : state.logs;
+    const sore = L.autoSoreness(logs, exercises, today);
     const manual = (state.soreness && state.soreness[today]) || {};
     for (const [region, level] of Object.entries(manual)) {
       if (level > 0) sore[region] = { level, source: 'manual' };
@@ -484,7 +486,7 @@
     const sore = soreByRegion();
     const chip = (k, label) => '<button class="chip ' + (bodyMode === k ? 'on' : '') + '" data-bodymode="' + k + '">' + label + '</button>';
     view.innerHTML =
-      '<div class="row" style="margin-bottom:8px">' + chip('figure', 'Figure') + chip('heat', 'Training') + chip('sore', 'Soreness') + '</div>' +
+      '<div class="row" style="margin-bottom:8px">' + chip('sore', 'Recovery') + chip('heat', 'Training') + '</div>' +
       recoveryStats(sore) +
       '<div class="card" style="padding:6px;position:relative"><div id="body-canvas" style="height:440px;touch-action:none"></div>' +
       '<div id="body-dot" class="body-dot" hidden></div><div id="body-label" class="body-label" hidden></div></div>' +
@@ -495,7 +497,7 @@
       '</details>' +
       '<p class="muted">Drag to turn the figure. Tap a muscle to see its sets or log soreness. Tap it again, or tap away from the body, to clear. This is a stylised figure, not medical imaging. If pain is sharp, lasts, or gets worse, see a doctor or physiotherapist.</p>';
     window.BodyMap.render(document.getElementById('body-canvas'), {
-      mode: bodyMode === 'figure' ? 'plain' : bodyMode, load, sore,
+      mode: bodyMode, load, sore,
       onTap: (region, x, y) => onBodyTap(region, x, y, load, sore),
     });
     applyBodySelection(load, sore);
@@ -528,9 +530,9 @@
       return '<div class="ramp"></div><div class="row muted"><span>Fewer sets</span><span style="margin-left:auto">More sets</span></div>';
     }
     if (bodyMode === 'sore') {
-      const levels = ['', 'Mild', 'Moderate', 'Severe'];
-      const colors = ['', '#f0b429', '#f0893b', '#ef4444'];
-      return '<div class="muted">' + [1, 2, 3].map((i) => '<span class="swatch" style="background:' + colors[i] + '"></span>' + levels[i]).join('&nbsp;&nbsp;&nbsp;') + '</div>';
+      const levels = ['Fresh', 'Mild', 'Moderate', 'Severe'];
+      const colors = ['#7d7d95', '#f0b429', '#f0893b', '#ef4444'];
+      return '<div class="muted">' + [0, 1, 2, 3].map((i) => '<span class="swatch" style="background:' + colors[i] + '"></span>' + levels[i]).join('&nbsp;&nbsp;&nbsp;') + '</div>';
     }
     return '';
   }
@@ -550,14 +552,20 @@
           : '<p class="muted">No sets logged in the last 7 days.</p>') +
         '</div>';
     } else if (bodyMode === 'sore') {
+      // Recovery: muscles coloured by how recently and how hard they were worked. Fresh means not worked in the last few days.
       const levels = ['', 'Mild', 'Moderate', 'Severe'];
-      const rows = Object.entries(sore).filter(([, s]) => s && s.level > 0).sort((a, b) => b[1].level - a[1].level);
-      el.innerHTML = '<div class="card"><h3>Soreness (estimated)</h3>' +
-        '<p class="muted">Worked out automatically from your completed workouts. Muscles trained one day ago are the most sore, and the effect fades after three days.</p>' +
+      const worked = Object.entries(sore).filter(([, s]) => s && s.level > 0);
+      const hardest = worked.slice().sort((a, b) => (b[1].score || b[1].level * 5) - (a[1].score || a[1].level * 5)).slice(0, 3);
+      const fresh = Object.keys(REGION_INFO).filter((r) => !(sore[r] && sore[r].level > 0));
+      el.innerHTML = '<div class="card"><h3>Recovery</h3>' +
+        '<p class="muted">Estimated from your saved workouts. A muscle lights up as soon as you save a workout that trains it, and fades over three days.</p>' +
         bodyLegend() +
-        (rows.length
-          ? rows.map(([r, s]) => '<div class="row"><span>' + name(r) + '</span><span style="margin-left:auto">' + levels[s.level] + '</span></div>').join('')
-          : '<p class="muted">No soreness estimated right now.</p>') +
+        '<h3 style="margin-top:12px">Worked hardest recently</h3>' +
+        (hardest.length
+          ? hardest.map(([r, s]) => '<div class="row"><span>' + name(r) + '</span><span style="margin-left:auto">' + levels[s.level] + '</span></div>').join('')
+          : '<p class="muted">Nothing worked in the last few days.</p>') +
+        '<h3 style="margin-top:12px">Fresh</h3>' +
+        '<p>' + (fresh.length ? fresh.map((r) => name(r)).join(', ') : 'None') + '</p>' +
         '</div>';
     } else {
       el.innerHTML = '';
@@ -604,7 +612,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v29';
+  const APP_VERSION = 'v30';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',

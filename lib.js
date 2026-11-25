@@ -313,7 +313,7 @@
     'lower back': 'lower_back', neck: 'neck',
   };
 
-  // Sets per region in the last `days` days, counted from logged sets.
+  // Sets per region in the last `days` days. A primary muscle counts each set in full; a secondary muscle counts half.
   function weeklyLoad(logs, exercises, todayISO, days) {
     const byId = new Map(exercises.map((e) => [e.id, e]));
     const since = shiftISO(todayISO, -(days - 1));
@@ -327,6 +327,10 @@
         for (const m of ex.primaryMuscles || []) {
           const r = REGION_OF[m];
           if (r) load[r] = (load[r] || 0) + sets;
+        }
+        for (const m of ex.secondaryMuscles || []) {
+          const r = REGION_OF[m];
+          if (r) load[r] = (load[r] || 0) + sets * 0.5;
         }
       }
     }
@@ -344,10 +348,11 @@
     return out;
   }
 
-  // Estimated soreness from completed workouts. Sets count most 1 day after training and
-  // less on the days either side. Returns { region: { level: 1-3, score } } for muscles that are sore.
+  // Estimated soreness from saved workouts. A workout counts from the moment it is saved: today's sets count
+  // at 0.8 each, yesterday's at most (1.0), then less each day after. Returns { region: { level: 1-3, score } }
+  // for muscles that are sore; any muscle not listed is fresh.
   function autoSoreness(logs, exercises, todayISO) {
-    const WEIGHT = [0, 1.0, 0.7, 0.3]; // age in days: 0 (today, no soreness yet), 1, 2, 3
+    const WEIGHT = [0.8, 1.0, 0.6, 0.3]; // age in days: 0 (today), 1, 2, 3
     const score = {};
     for (let age = 0; age < WEIGHT.length; age++) {
       const day = shiftISO(todayISO, -age);
