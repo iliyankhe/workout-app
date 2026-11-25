@@ -96,3 +96,12 @@ td.num, th.num { text-align: right; }
 .timer-bar #timer-label { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .timer-bar #timer-time { font-size: 22px; margin-left: auto; font-variant-numeric: tabular-nums; }
 .timer-bar button { padding: 6px 10px; font-size: 13px; }
+
+/* Workout log: one list per day, each lift and stretch a row */
+.lift { border-top: 1px solid var(--line); padding: 12px 0 6px; }
+.lift .meta { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.lift details { margin-top: 8px; }
+.lift details ol { padding-left: 20px; margin: 6px 0 0; font-size: 14px; }
+.lift details li { margin-bottom: 4px; }
+.lift th { font-size: 12px; color: var(--muted); font-weight: 500; text-align: left; padding-bottom: 4px; }
+.lift.done strong { text-decoration: line-through; color: var(--muted); }

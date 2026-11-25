@@ -98,12 +98,8 @@
       const dd = (state.drafts || {})[day.title] || {};
       for (const k of Object.keys(dd)) if (k.startsWith('stretch|')) doneStretch[k.slice(8)] = dd[k];
       html += '<h2>' + esc(day.title || 'Today') + '</h2>';
-      html += stretchSection('warmup', day, plan.cooldown || {});
-      html += '<h2>Lifts</h2>';
       html += soreCheck(day);
-      day.exercises.forEach((ex, i) => html += exerciseCard(ex, i));
-      if (!plan.cooldown || plan.cooldown.enabled !== false) html += stretchSection('cooldown', day, plan.cooldown || {});
-      html += logSession(day);
+      html += logSession(day, plan);
     }
     html += librarySection();
     view.innerHTML = html;
@@ -125,29 +121,10 @@
       '</div>';
   }
 
-  // Which exercise card has its replacement list open: { day, idx }, or null.
+  // Which lift has its replacement list open: { day, idx }, or null.
   let swapOpen = null;
 
-  function exerciseCard(ex, i) {
-    const e = index.byId.get(ex.exercise_id);
-    const muscles = e ? [].concat(e.primaryMuscles, e.secondaryMuscles).map((m) => '<span class="pill">' + esc(m) + '</span>').join('') : '';
-    const broken = !e;
-    return '<div class="card exercise">' +
-      '<h3>' + (i + 1) + '. ' + esc(broken ? ex.exercise_id : e.name) + '</h3>' +
-      '<div class="meta">' + esc(ex.sets) + ' sets × ' + esc(ex.reps || '?') + ' reps' +
-      (ex.rest_sec ? ' · rest ' + esc(ex.rest_sec) + 's' : '') + (ex.target_lb != null ? ' · target ' + esc(ex.target_lb) + ' lb' : '') + '</div>' +
-      (ex.notes ? '<div class="meta">' + esc(ex.notes) + '</div>' : '') +
-      '<div style="margin:8px 0">' + (e ? animHTML(e) : '') + '</div>' +
-      '<div>' + muscles + '</div>' +
-      (e && e.instructions && e.instructions.length
-        ? '<details><summary>How to do it</summary><ol>' + e.instructions.map((s) => '<li>' + esc(s) + '</li>').join('') + '</ol></details>'
-        : '') +
-      (e ? '<div class="row" style="margin-top:8px"><button class="chip" data-replace="' + i + '">Replace</button></div>' : '') +
-      (swapOpen && swapOpen.day === selectedDay && swapOpen.idx === i ? swapPanel(i) : '') +
-      '</div>';
-  }
-
-  // Lists exercises for the same muscles that can take this card's place.
+  // Lists exercises for the same muscles that can take this lift's place.
   function swapPanel(i) {
     const day = state.workoutPlan.days[selectedDay];
     const ex = day.exercises[i];
@@ -164,40 +141,88 @@
       '<button class="chip" data-cancel-swap="1" style="margin-top:8px">Close</button></div>';
   }
 
-  function stretchSection(kind, day, cfg) {
+  function lastWeightFor(exId) {
+    const rows = L.exerciseHistory(state.logs, exId);
+    return rows.length ? rows[rows.length - 1].topWeight : '';
+  }
+
+  // Demo and instructions stay closed until opened, so the list stays short.
+  function detailsHTML(e) {
+    if (!e) return '';
+    let html = '';
+    if (e.images && e.images.length) {
+      html += '<details><summary>Show demo</summary><div style="margin-top:8px">' + animHTML(e) + '</div></details>';
+    }
+    if (e.instructions && e.instructions.length) {
+      html += '<details><summary>How to do it</summary><ol>' + e.instructions.map((s) => '<li>' + esc(s) + '</li>').join('') + '</ol></details>';
+    }
+    return html;
+  }
+
+  // Warmup or cooldown moves, each with a tick box and a timer. Ticks are saved with the workout log.
+  function stretchBlock(kind, day, cfg) {
     const ids = day.exercises.map((e) => e.exercise_id);
     const isWarm = kind === 'warmup';
     const picks = isWarm ? L.warmupFor(ids, exercises) : L.cooldownFor(ids, exercises, { hold_sec: cfg.hold_sec });
     if (!picks.length) return '';
-    const heading = isWarm ? 'Warmup' : 'Cooldown stretches';
     const intro = isWarm
-      ? 'Do these before your first lift: a few minutes of light cardio, then slow reps of each move.'
+      ? 'Light cardio, then slow reps of each move before your first lift.'
       : 'One stretch for each muscle you trained. Hold each for about ' + esc(cfg.hold_sec) + ' seconds.';
-    let html = '<h2>' + heading + '</h2><p class="muted">' + intro + '</p>';
+    let html = '<h3 style="margin-top:14px">' + (isWarm ? 'Warmup' : 'Cooldown stretches') + '</h3>' +
+      '<p class="muted" style="font-size:13px">' + intro + '</p>';
     picks.forEach((p, i) => {
       const key = day.title + '|' + kind + '|' + p.exercise.id;
       const done = !!doneStretch[key];
       const meta = isWarm
         ? (p.minutes ? p.minutes + ' min easy pace' : (p.reps || 10) + ' slow reps each side')
-        : 'For ' + p.muscle + ' · hold ' + cfg.hold_sec + ' s';
-      html += '<div class="card exercise' + (done ? ' done' : '') + '">' +
-        '<label class="check" style="margin:0 0 8px"><input type="checkbox" data-stretch="' + esc(key) + '" ' + (done ? 'checked' : '') + '>' +
-        '<h3 style="margin:0">' + (i + 1) + '. ' + esc(p.exercise.name) + '</h3></label>' +
-        '<div class="meta">' + (isWarm ? '' : esc(p.muscle) + ' · ') + esc(meta) + '</div>' +
-        '<div class="row" style="margin:6px 0"><button class="chip" data-timer="' + (isWarm ? (p.minutes ? p.minutes * 60 : 30) : cfg.hold_sec) +
-        '" data-label="' + esc(p.exercise.name) + (isWarm ? '' : ' hold') + '">Timer ' + esc(isWarm ? (p.minutes ? p.minutes + ' min' : '30 s') : cfg.hold_sec + ' s') + '</button></div>' +
-        '<div style="margin:8px 0">' + animHTML(p.exercise) + '</div>' +
-        (p.exercise.instructions && p.exercise.instructions.length
-          ? '<details><summary>How to do it</summary><ol>' + p.exercise.instructions.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol></details>'
-          : '') +
+        : esc(p.muscle) + ' · hold ' + cfg.hold_sec + ' s';
+      const secs = isWarm ? (p.minutes ? p.minutes * 60 : 30) : cfg.hold_sec;
+      const timerText = isWarm ? (p.minutes ? p.minutes + ' min' : '30 s') : cfg.hold_sec + ' s';
+      html += '<div class="lift' + (done ? ' done' : '') + '" data-stretch-row="' + esc(key) + '">' +
+        '<label class="check" style="margin:0 0 4px"><input type="checkbox" data-stretch="' + esc(key) + '" ' + (done ? 'checked' : '') + '>' +
+        '<span><strong>' + (i + 1) + '. ' + esc(p.exercise.name) + '</strong></span></label>' +
+        '<div class="meta">' + meta + '</div>' +
+        '<div class="row" style="margin:6px 0"><button class="chip" data-timer="' + secs + '" data-label="' + esc(p.exercise.name) + (isWarm ? '' : ' hold') + '">Timer ' + esc(timerText) + '</button></div>' +
+        detailsHTML(p.exercise) +
         '</div>';
     });
     return html;
   }
 
-  function lastWeightFor(exId) {
-    const rows = L.exerciseHistory(state.logs, exId);
-    return rows.length ? rows[rows.length - 1].topWeight : '';
+  // One lift: name, sets and reps, last weight, target, the set log with weights, then the demo and replace controls.
+  function liftBlock(ex, i, d) {
+    const e = index.byId.get(ex.exercise_id);
+    const last = lastWeightFor(ex.exercise_id);
+    const hasLast = last !== '' && last != null;
+    const rest = ex.rest_sec || 90;
+    const meta = esc(ex.sets) + ' sets × ' + esc(ex.reps || '?') + ' reps' +
+      (ex.rest_sec ? ' · rest ' + esc(ex.rest_sec) + 's' : '') +
+      (hasLast ? ' · last ' + esc(last) + ' lb' : '');
+    let rows = '';
+    for (let s = 0; s < ex.sets; s++) {
+      const key = ex.exercise_id + '|' + s;
+      const repsV = d[key + '|reps'] != null ? d[key + '|reps'] : (parseInt(ex.reps, 10) || '');
+      const wV = d[key + '|weight_lb'] != null ? d[key + '|weight_lb'] : (ex.target_lb != null ? ex.target_lb : (hasLast ? last : ''));
+      rows += '<tr><td>Set ' + (s + 1) + '</td>' +
+        '<td><input class="num" inputmode="numeric" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="reps" value="' + esc(repsV) + '" placeholder="reps"></td>' +
+        '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(wV) + '" placeholder="lb"></td>' +
+        '<td><button class="chip" data-timer="' + rest + '" data-label="' + esc(exName(ex.exercise_id)) + ' rest">Rest ' + esc(rest) + 's</button></td></tr>';
+    }
+    const muscles = e ? [].concat(e.primaryMuscles, e.secondaryMuscles).map((m) => '<span class="pill">' + esc(m) + '</span>').join('') : '';
+    return '<div class="lift">' +
+      '<div><strong>' + (i + 1) + '. ' + esc(e ? e.name : ex.exercise_id) + '</strong></div>' +
+      '<div class="meta">' + meta + '</div>' +
+      (ex.notes ? '<div class="meta">' + esc(ex.notes) + '</div>' : '') +
+      '<div class="row" style="margin:8px 0"><span class="muted">Target</span>' +
+        '<input class="num" inputmode="decimal" data-target="' + esc(ex.exercise_id) + '" value="' + esc(ex.target_lb != null ? ex.target_lb : '') + '" placeholder="lb">' +
+        '<button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="-5">−5 lb</button>' +
+        '<button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="5">+5 lb</button></div>' +
+      '<table><thead><tr><th></th><th>Reps</th><th>Weight</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<div style="margin-top:6px">' + muscles + '</div>' +
+      detailsHTML(e) +
+      (e ? '<div class="row" style="margin-top:8px"><button class="chip" data-replace="' + i + '">Replace</button></div>' : '') +
+      (swapOpen && swapOpen.day === selectedDay && swapOpen.idx === i ? swapPanel(i) : '') +
+      '</div>';
   }
 
   // Session drafts: every set value and stretch tick is saved as it changes, so nothing is lost if the page closes.
@@ -207,32 +232,17 @@
     return state.drafts[title];
   }
 
-  function logSession(day) {
+  // The whole day in one list: warmup, each lift with its set log, then cooldown, so nothing needs a scroll back up.
+  function logSession(day, plan) {
     const d = (state.drafts || {})[day.title] || {};
-    const rows = day.exercises.map((ex) => {
-      const sets = [];
-      const w = lastWeightFor(ex.exercise_id);
-      for (let s = 0; s < ex.sets; s++) {
-        const key = ex.exercise_id + '|' + s;
-        const repsV = d[key + '|reps'] != null ? d[key + '|reps'] : (parseInt(ex.reps, 10) || '');
-        const wV = d[key + '|weight_lb'] != null ? d[key + '|weight_lb'] : (ex.target_lb != null ? ex.target_lb : w);
-        const rest = ex.rest_sec || 90;
-        sets.push('<tr><td>Set ' + (s + 1) + '</td>' +
-          '<td><input class="num" inputmode="numeric" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="reps" value="' + esc(repsV) + '" placeholder="reps"></td>' +
-          '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(wV) + '" placeholder="lb"></td>' +
-          '<td><button class="chip" data-timer="' + rest + '" data-label="' + esc(exName(ex.exercise_id)) + ' rest">Rest ' + esc(rest) + 's</button></td></tr>');
-      }
-      return '<h3 style="margin-top:12px">' + esc(exName(ex.exercise_id)) + '</h3>' +
-        '<div class="row" style="margin-bottom:6px"><span class="muted">Target</span><input class="num" inputmode="decimal" data-target="' + esc(ex.exercise_id) + '" value="' + esc(ex.target_lb != null ? ex.target_lb : '') + '" placeholder="lb"></div>' +
-        '<div class="row" style="margin-bottom:6px"><button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="-5">−5 lb</button>' +
-        '<button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="5">+5 lb</button>' +
-        '<span class="muted" style="font-size:12px">all sets of this lift</span></div>' +
-        '<table><tbody>' + sets.join('') + '</tbody></table>';
-    }).join('');
+    const showCooldown = !plan.cooldown || plan.cooldown.enabled !== false;
     return '<h2>Log this workout</h2><div class="card">' +
       '<label>Date</label><input type="date" id="log-date" value="' + esc(d.__date || todayISO()) + '">' +
       '<p class="muted" style="font-size:12px">Each entry is saved as you type, so nothing is lost if the page closes.</p>' +
-      rows +
+      stretchBlock('warmup', day, plan.cooldown || {}) +
+      '<h3 style="margin-top:14px">Lifts</h3>' +
+      day.exercises.map((ex, i) => liftBlock(ex, i, d)).join('') +
+      (showCooldown ? stretchBlock('cooldown', day, plan.cooldown || {}) : '') +
       '<div class="row" style="margin-top:12px"><button class="primary" id="save-session" data-day="' + selectedDay + '">Save workout</button></div>' +
       '</div>';
   }
@@ -589,7 +599,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v25';
+  const APP_VERSION = 'v26';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -767,8 +777,8 @@
       doneStretch[t.dataset.stretch] = t.checked;
       draftFor(t.dataset.stretch.split('|')[0])['stretch|' + t.dataset.stretch] = t.checked;
       save();
-      const card = t.closest('.card');
-      if (card) card.classList.toggle('done', t.checked);
+      const row = t.closest('.lift');
+      if (row) row.classList.toggle('done', t.checked);
       return;
     }
     if (t.id === 'meal-unit') { mealUnit = t.value; state.mealUnit = mealUnit; save(); renderMeals(); return; }
