@@ -98,12 +98,29 @@
       html += '<h2>' + esc(day.title || 'Today') + '</h2>';
       html += stretchSection('warmup', day, plan.cooldown || {});
       html += '<h2>Lifts</h2>';
+      html += soreCheck(day);
       day.exercises.forEach((ex, i) => html += exerciseCard(ex, i));
       if (!plan.cooldown || plan.cooldown.enabled !== false) html += stretchSection('cooldown', day, plan.cooldown || {});
       html += logSession(day);
     }
     html += librarySection();
     view.innerHTML = html;
+  }
+
+  // Asks about soreness before training any muscle that is at least moderately sore.
+  function soreCheck(day) {
+    const sore = soreByRegion();
+    const today = todayISO();
+    const manual = (state.soreness || {})[today] || {};
+    const due = dayRegions(day).filter((r) => sore[r] && sore[r].level >= 2);
+    if (!due.length) return '';
+    const levels = ['None', 'Mild', 'Moderate', 'Severe'];
+    return '<div class="card warn"><h3>Still sore?</h3>' +
+      '<p class="muted">These muscles are in today\'s workout and look sore. Confirm how they feel before you train.</p>' +
+      due.map((r) => '<div class="row"><span>' + esc(REGION_NAMES[r] || r) + '</span>' +
+        '<span class="muted" style="margin-left:auto">estimated ' + levels[sore[r].level] + '</span></div>' +
+        soreChips(r, manual[r])).join('') +
+      '</div>';
   }
 
   function exerciseCard(ex, i) {
@@ -334,19 +351,43 @@
   };
   let bodyMounted = false;
 
+  // Soreness today: the estimate from completed workouts, replaced by anything entered by hand.
+  // A manual 0 clears the estimate for that muscle.
+  function soreByRegion() {
+    const today = todayISO();
+    const sore = L.autoSoreness(state.logs, exercises, today);
+    const manual = (state.soreness && state.soreness[today]) || {};
+    for (const [region, level] of Object.entries(manual)) {
+      if (level > 0) sore[region] = { level, source: 'manual' };
+      else delete sore[region];
+    }
+    return sore;
+  }
+
+  function dayRegions(day) {
+    const set = new Set();
+    for (const ex of day.exercises || []) {
+      const e = index && index.byId.get(ex.exercise_id);
+      if (!e) continue;
+      for (const m of e.primaryMuscles || []) { const r = L.REGION_OF[m]; if (r) set.add(r); }
+    }
+    return [...set];
+  }
+
   function renderBody() {
     const load = L.weeklyLoad(state.logs, exercises, todayISO(), 7);
-    const sore = L.autoSoreness(state.logs, exercises, todayISO());
+    const sore = soreByRegion();
     const chip = (k, label) => '<button class="chip ' + (bodyMode === k ? 'on' : '') + '" data-bodymode="' + k + '">' + label + '</button>';
     view.innerHTML =
       '<div class="row" style="margin-bottom:8px">' + chip('figure', 'Figure') + chip('heat', 'Training') + chip('sore', 'Soreness') + '</div>' +
-      '<div class="card" style="padding:6px"><div id="body-canvas" style="height:440px;touch-action:none"></div></div>' +
+      '<div class="card" style="padding:6px;position:relative"><div id="body-canvas" style="height:440px;touch-action:none"></div>' +
+      '<div id="body-label" class="body-label" hidden></div></div>' +
       '<div id="body-menu"></div>' +
       '<div id="body-panel"></div>' +
       '<p class="muted">Drag to turn the figure. Tap a muscle to see its sets or log soreness. This is a stylised figure, not medical imaging. If pain is sharp, lasts, or gets worse, see a doctor or physiotherapist.</p>';
     window.BodyMap.render(document.getElementById('body-canvas'), {
       mode: bodyMode === 'figure' ? 'plain' : bodyMode, load, sore,
-      onTap: (region) => showRegion(region, load, sore),
+      onTap: (region, x, y) => showRegion(region, load, sore, x, y),
     });
     renderBodyMenu(load, sore);
   }
@@ -380,14 +421,30 @@
     }
   }
 
-  function showRegion(region, load, sore) {
-    const panel = document.getElementById('body-panel');
-    if (!panel) return;
+  function showRegion(region, load, sore, x, y) {
     const levels = ['None', 'Mild', 'Moderate', 'Severe'];
     const level = sore[region] ? sore[region].level : 0;
+    const label = document.getElementById('body-label');
+    if (label && x != null) {
+      label.hidden = false;
+      label.textContent = (REGION_NAMES[region] || region) + ' · ' + (load[region] || 0) + ' sets · ' + levels[level];
+      label.style.left = Math.max(8, Math.min(x, label.parentNode.clientWidth - 150)) + 'px';
+      label.style.top = Math.max(8, y - 14) + 'px';
+    }
+    const panel = document.getElementById('body-panel');
+    if (!panel) return;
+    const manual = ((state.soreness || {})[todayISO()] || {})[region];
     panel.innerHTML = '<div class="card"><h3>' + esc(REGION_NAMES[region] || region) + '</h3>' +
       '<p class="muted">Sets in the last 7 days: ' + (load[region] || 0) + '</p>' +
-      '<p class="muted">Estimated soreness: ' + levels[level] + '</p></div>';
+      '<p class="muted">Soreness today: ' + levels[level] + (sore[region] && sore[region].source === 'manual' ? ' (entered by you)' : ' (estimated)') + '</p>' +
+      soreChips(region, manual) + '</div>';
+  }
+
+  function soreChips(region, current) {
+    const levels = ['None', 'Mild', 'Moderate', 'Severe'];
+    return '<label>Enter soreness for today</label><div class="row">' +
+      levels.map((l, i) => '<button class="chip ' + (current === i ? 'on' : '') + '" data-region="' + region + '" data-soreness="' + i + '">' + l + '</button>').join('') +
+      '</div>';
   }
 
   // Import & backup --------------------------------------------------------
@@ -473,11 +530,10 @@
     if (t.dataset.bodymode) { bodyMode = t.dataset.bodymode; renderBody(); return; }
     if (t.dataset.soreness != null && t.dataset.region) {
       const today = todayISO();
+      state.soreness = state.soreness || {};
       state.soreness[today] = state.soreness[today] || {};
-      const level = Number(t.dataset.soreness);
-      if (level === 0) delete state.soreness[today][t.dataset.region];
-      else state.soreness[today][t.dataset.region] = level;
-      save(); renderBody(); return;
+      state.soreness[today][t.dataset.region] = Number(t.dataset.soreness);
+      save(); render(); return;
     }
     if (t.dataset.day != null && t.dataset.day !== '') { selectedDay = Number(t.dataset.day); render(); return; }
     if (t.dataset.import) {
