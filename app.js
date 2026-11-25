@@ -123,6 +123,9 @@
       '</div>';
   }
 
+  // Which exercise card has its replacement list open: { day, idx }, or null.
+  let swapOpen = null;
+
   function exerciseCard(ex, i) {
     const e = index.byId.get(ex.exercise_id);
     const muscles = e ? [].concat(e.primaryMuscles, e.secondaryMuscles).map((m) => '<span class="pill">' + esc(m) + '</span>').join('') : '';
@@ -137,7 +140,26 @@
       (e && e.instructions && e.instructions.length
         ? '<details><summary>How to do it</summary><ol>' + e.instructions.map((s) => '<li>' + esc(s) + '</li>').join('') + '</ol></details>'
         : '') +
+      (e ? '<div class="row" style="margin-top:8px"><button class="chip" data-replace="' + i + '">Replace</button></div>' : '') +
+      (swapOpen && swapOpen.day === selectedDay && swapOpen.idx === i ? swapPanel(i) : '') +
       '</div>';
+  }
+
+  // Lists exercises for the same muscles that can take this card's place.
+  function swapPanel(i) {
+    const day = state.workoutPlan.days[selectedDay];
+    const ex = day.exercises[i];
+    const options = L.replacementsFor(ex.exercise_id, exercises, day.exercises.map((x) => x.exercise_id), 12);
+    if (!options.length) {
+      return '<div class="card"><p class="muted">No other lifts work these same muscles.</p>' +
+        '<button class="chip" data-cancel-swap="1">Close</button></div>';
+    }
+    return '<div class="card"><h3>Replace with</h3>' +
+      '<p class="muted">Same muscles. Your sets, reps, rest and notes stay the same.</p>' +
+      options.map((o) => '<div class="row" style="margin:6px 0"><span>' + esc(o.name) + '</span>' +
+        '<span class="muted" style="margin-left:auto;font-size:12px">' + esc(o.equipment || '') + '</span>' +
+        '<button class="chip" data-swap-to="' + esc(o.id) + '" data-swap-idx="' + i + '">Use</button></div>').join('') +
+      '<button class="chip" data-cancel-swap="1" style="margin-top:8px">Close</button></div>';
   }
 
   function stretchSection(kind, day, cfg) {
@@ -621,6 +643,18 @@
   view.addEventListener('click', (ev) => {
     const t = ev.target;
     if (t.id === 'save-session') { saveSession(Number(t.dataset.day)); return; }
+    if (t.dataset.replace != null) { swapOpen = { day: selectedDay, idx: Number(t.dataset.replace) }; render(); return; }
+    if (t.dataset.cancelSwap != null) { swapOpen = null; render(); return; }
+    if (t.dataset.swapTo) {
+      // Changes the planned exercise for this day. Earlier logs keep the exercise they were logged with.
+      const day = state.workoutPlan.days[selectedDay];
+      day.exercises[Number(t.dataset.swapIdx)].exercise_id = t.dataset.swapTo;
+      swapOpen = null;
+      save();
+      toast('Exercise replaced.');
+      render();
+      return;
+    }
     if (t.dataset.bodymode) { bodyMode = t.dataset.bodymode; renderBody(); return; }
     if (t.dataset.soreness != null && t.dataset.region) {
       const today = todayISO();

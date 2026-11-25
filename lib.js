@@ -280,6 +280,27 @@
     return out.concat(picks.map((p) => Object.assign(p, { reps: 10 })));
   }
 
+  // Exercises that can replace a planned one: lifts that work at least one of the same primary muscles.
+  // Best matches first (shared primary muscles count most, then shared secondary, then the same equipment).
+  function replacementsFor(exerciseId, exercises, excludeIds, limit) {
+    const from = exercises.find((e) => e.id === exerciseId);
+    if (!from) return [];
+    const skip = new Set(excludeIds || []); skip.add(exerciseId);
+    const prim = new Set(from.primaryMuscles || []);
+    const sec = new Set([].concat(from.secondaryMuscles || [], from.primaryMuscles || []));
+    const scored = [];
+    for (const e of exercises) {
+      if (skip.has(e.id) || e.category !== 'strength') continue;
+      const sharedPrimary = (e.primaryMuscles || []).filter((m) => prim.has(m)).length;
+      if (!sharedPrimary) continue;
+      const sharedSecondary = (e.secondaryMuscles || []).filter((m) => sec.has(m)).length;
+      const score = sharedPrimary * 2 + sharedSecondary + (e.equipment === from.equipment ? 0.5 : 0);
+      scored.push({ e, score });
+    }
+    scored.sort((a, b) => b.score - a.score || a.e.name.localeCompare(b.e.name));
+    return scored.slice(0, limit || 12).map((x) => x.e);
+  }
+
   // ---- Body map: muscle regions --------------------------------------------
   // Maps the dataset's muscle names onto the regions shown on the body map.
   const REGION_OF = {
@@ -382,7 +403,7 @@
     sectionFor, buildLibraryIndex, resolveExercise,
     validateWorkoutPlan, validateMealPlan,
     buildShoppingList, exerciseHistory, compareSessions, cooldownFor, warmupFor,
-    REGION_OF, weeklyLoad, latestSoreness, autoSoreness, shiftISO,
+    REGION_OF, weeklyLoad, latestSoreness, autoSoreness, shiftISO, replacementsFor,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
