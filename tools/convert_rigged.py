@@ -104,7 +104,7 @@ def arm_pose(world, parent, names, arm_angle=45.0):
         for i in range(len(W)):
             if under(parent, i, up): W[i] = D1 @ world[i]
         pl2 = (D1 @ np.append(pl, 1))[:3]; ph2 = (D1 @ np.append(ph, 1))[:3]
-        D2 = about(rot_between(ph2 - pl2, np.array([sx * 0.1, -0.2, 1.0])), pl2)
+        D2 = about(rot_between(ph2 - pl2, np.array([sx * np.sin(a), -np.cos(a), 0.0])), pl2)   # forearm in line with the upper arm
         ph2 = (D2 @ np.append(ph2, 1))[:3]   # wrist after the elbow bend
         # Anatomical position: roll the forearm so the thumb points outward, which turns the palm forward.
         k = (ph2 - pl2) / np.linalg.norm(ph2 - pl2)
