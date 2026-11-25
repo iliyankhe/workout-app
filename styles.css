@@ -79,3 +79,5 @@ td.num, th.num { text-align: right; }
 .card.done { border-color: var(--accent); }
 .card.done h3 { color: var(--muted); }
 #body-canvas canvas { border-radius: 10px; }
+.ramp { height: 12px; border-radius: 6px; margin: 8px 0 4px; background: linear-gradient(90deg, #7d7d95, #ef6461); }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }

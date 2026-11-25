@@ -15,7 +15,7 @@
   let mealUnit = state.mealUnit || 'g';
   let search = '';
   let doneStretch = {}; // { 'dayTitle|kind|exercise_id': true } for the current session, cleared on save
-  let bodyMode = 'heat';
+  let bodyMode = 'figure';
 
   // ---- helpers -------------------------------------------------------------
   function esc(s) {
@@ -337,17 +337,46 @@
   function renderBody() {
     const load = L.weeklyLoad(state.logs, exercises, todayISO(), 7);
     const sore = L.latestSoreness(state.soreness, todayISO(), 3);
+    const chip = (k, label) => '<button class="chip ' + (bodyMode === k ? 'on' : '') + '" data-bodymode="' + k + '">' + label + '</button>';
     view.innerHTML =
-      '<div class="row" style="margin-bottom:8px">' +
-      '<button class="chip ' + (bodyMode === 'heat' ? 'on' : '') + '" data-bodymode="heat">Training, last 7 days</button>' +
-      '<button class="chip ' + (bodyMode === 'sore' ? 'on' : '') + '" data-bodymode="sore">Soreness, last 3 days</button></div>' +
+      '<div class="row" style="margin-bottom:8px">' + chip('figure', 'Figure') + chip('heat', 'Training') + chip('sore', 'Soreness') + '</div>' +
       '<div class="card" style="padding:6px"><div id="body-canvas" style="height:440px;touch-action:none"></div></div>' +
+      '<div id="body-menu"></div>' +
       '<div id="body-panel"></div>' +
       '<p class="muted">Drag to turn the figure. Tap a muscle to see its sets or log soreness. This is a stylised figure, not medical imaging. If pain is sharp, lasts, or gets worse, see a doctor or physiotherapist.</p>';
     window.BodyMap.render(document.getElementById('body-canvas'), {
-      mode: bodyMode, load, sore,
+      mode: bodyMode === 'figure' ? 'plain' : bodyMode, load, sore,
       onTap: (region) => showRegion(region, load, sore),
     });
+    renderBodyMenu(load, sore);
+  }
+
+  // Each colouring mode has its own menu: a legend and the muscles it applies to.
+  function renderBodyMenu(load, sore) {
+    const el = document.getElementById('body-menu');
+    if (!el) return;
+    const name = (r) => esc(REGION_NAMES[r] || r);
+    if (bodyMode === 'heat') {
+      const rows = Object.entries(load).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+      el.innerHTML = '<div class="card"><h3>Training, last 7 days</h3>' +
+        '<div class="ramp"></div><div class="row muted"><span>Fewer sets</span><span style="margin-left:auto">More sets</span></div>' +
+        (rows.length
+          ? rows.map(([r, v]) => '<div class="row"><span>' + name(r) + '</span><span style="margin-left:auto">' + v + ' sets</span></div>').join('')
+          : '<p class="muted">No sets logged in the last 7 days.</p>') +
+        '</div>';
+    } else if (bodyMode === 'sore') {
+      const levels = ['', 'Mild', 'Moderate', 'Severe'];
+      const colors = ['', '#f0b429', '#f0893b', '#ef4444'];
+      const rows = Object.entries(sore).filter(([, s]) => s && s.level > 0).sort((a, b) => b[1].level - a[1].level);
+      el.innerHTML = '<div class="card"><h3>Soreness, last 3 days</h3>' +
+        [1, 2, 3].map((i) => '<span class="swatch" style="background:' + colors[i] + '"></span>' + levels[i]).join('&nbsp;&nbsp;&nbsp;') +
+        (rows.length
+          ? rows.map(([r, s]) => '<div class="row"><span>' + name(r) + '</span><span style="margin-left:auto">' + levels[s.level] + '</span></div>').join('')
+          : '<p class="muted">No soreness logged in the last 3 days.</p>') +
+        '</div>';
+    } else {
+      el.innerHTML = '';
+    }
   }
 
   function showRegion(region, load, sore) {
