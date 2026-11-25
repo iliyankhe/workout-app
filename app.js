@@ -365,20 +365,14 @@
     return [...new Set(state.logs.flatMap((l) => l.entries.map((e) => e.exercise_id)))];
   }
 
-  // Options for the Progress dropdown. Empty text lists logged exercises; typed text lists library exercises
-  // whose names start with it, logged ones first. The selected exercise always stays in the list.
+  // Options for the Progress dropdown: only exercises you have logged. Empty text lists them all;
+  // typed text keeps the ones whose names start with it. The selected exercise stays in the list when the box is empty.
   function progressOptions(text, selected) {
     const logged = loggedExerciseIds();
     const q = L.normalizeName(text);
-    let list;
-    if (!q) {
-      list = logged;
-    } else {
-      const matches = exercises.filter((e) => L.normalizeName(e.name).startsWith(q)).map((e) => e.id);
-      list = matches.sort((a, b) => (logged.includes(b) ? 1 : 0) - (logged.includes(a) ? 1 : 0)).slice(0, 80);
-    }
-    if (selected && !list.includes(selected) && (!q || logged.includes(selected))) list = [selected].concat(list);
-    if (!list.length) return '<option disabled>No exercise starts with "' + esc(text) + '"</option>';
+    let list = q ? logged.filter((id) => L.normalizeName(exName(id)).startsWith(q)) : logged.slice();
+    if (!q && selected && !list.includes(selected)) list = [selected].concat(list);
+    if (!list.length) return '<option disabled>No logged exercise starts with "' + esc(text) + '"</option>';
     return list.map((id) => '<option value="' + esc(id) + '"' + (id === selected ? ' selected' : '') + '>' + esc(exName(id)) + '</option>').join('');
   }
 
@@ -636,7 +630,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.33';
+  const APP_VERSION = 'v1.34';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
