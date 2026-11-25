@@ -271,9 +271,11 @@
     if (!entries.length && !warmup.length && !cooldown.length) { toast('Enter reps or tick a stretch first.', 'err'); return; }
     // Replace an earlier save for the same date and day, so re-saving does not duplicate.
     state.logs = state.logs.filter((l) => !(l.date === date && l.day === day.title));
-    state.logs.push({ date, day: day.title, entries, warmup, cooldown });
+    const log = { date, day: day.title, entries, warmup, cooldown };
+    state.logs.push(log);
     if (state.drafts) delete state.drafts[day.title];
     save();
+    queueUpload(log);
     Object.keys(doneStretch).forEach((k) => { if (k.startsWith(prefix)) delete doneStretch[k]; });
     toast('Saved ' + date + ' workout.', 'ok');
   }
@@ -360,6 +362,45 @@
   }
 
   // Progress ----------------------------------------------------------------
+  // ---- Cloud copy (Supabase) ---------------------------------------------------
+  // Each saved workout joins a queue and is sent to the workout_logs table (see supabase/schema.sql).
+  // The app can only add rows there. Off until window.SUPABASE_CONFIG is set: { url, key }.
+  const SUPABASE = window.SUPABASE_CONFIG || null;
+  let flushing = false;
+
+  function queueUpload(log) {
+    if (!SUPABASE) return;
+    state.uploadQueue = (state.uploadQueue || []).concat([log]);
+    save();
+    flushUploads();
+  }
+
+  // Sends queued workouts one at a time. A network failure keeps the workout queued for the next try.
+  // A rejected row (4xx) is dropped so it cannot block the queue.
+  function flushUploads() {
+    if (!SUPABASE || flushing || !(state.uploadQueue || []).length) return;
+    flushing = true;
+    const next = state.uploadQueue[0];
+    fetch(SUPABASE.url + '/rest/v1/workout_logs', {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE.key,
+        Authorization: 'Bearer ' + SUPABASE.key,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ date: next.date, day: next.day, entries: next.entries, warmup: next.warmup, cooldown: next.cooldown }),
+    }).then((r) => {
+      const rejected = r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429;
+      if (!r.ok && !rejected) throw new Error('retry ' + r.status);
+      if (!r.ok) toast('A workout could not be uploaded (error ' + r.status + '). It is still saved on this phone.', 'err');
+      state.uploadQueue = state.uploadQueue.slice(1);
+      save();
+      flushing = false;
+      flushUploads();
+    }).catch(() => { flushing = false; });
+  }
+
   // Exercises you have logged, in the order they were first logged.
   function loggedExerciseIds() {
     return [...new Set(state.logs.flatMap((l) => l.entries.map((e) => e.exercise_id)))];
@@ -630,7 +671,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.34';
+  const APP_VERSION = 'v1.35';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -932,6 +973,7 @@
 
   // ---- boot ----------------------------------------------------------------
   setupTimerBar();
+  flushUploads();
   fetch('data/exercises.json')
     .then((r) => r.json())
     .then((data) => {
