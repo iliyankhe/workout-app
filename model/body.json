@@ -116,7 +116,7 @@
  "upAxis": "y",
  "frontAxis": "+z",
  "height": 1.76,
- "pose": "anatomical position",
+ "pose": "arms out, elbows bent, forearms forward",
  "seamSegments": 682,
  "source": "Universal Base Characters by Quaternius (CC0), converted by convert_rigged.py"
 }

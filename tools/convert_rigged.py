@@ -91,7 +91,7 @@ def about(R, p):
     M = np.eye(4); M[:3, :3] = R; M[:3, 3] = p - R @ p
     return M
 
-def arm_pose(world, parent, names, side_bias=0.3):
+def arm_pose(world, parent, names, arm_angle=45.0):
     """Posed world matrices: each upper arm turns down to hang beside the body, and each forearm
     drops with a slight forward bend at the elbow. Everything below a bone moves with it."""
     W = list(world)
@@ -99,11 +99,13 @@ def arm_pose(world, parent, names, side_bias=0.3):
         up, lo, ha = names[f'upperarm_{side}'], names[f'lowerarm_{side}'], names[f'hand_{side}']
         pu, pl, ph = world[up][:3, 3], world[lo][:3, 3], world[ha][:3, 3]
         sx = 1.0 if (pl - pu)[0] >= 0 else -1.0
-        D1 = about(rot_between(pl - pu, np.array([sx * side_bias, -1.0, 0.0])), pu)
+        a = np.radians(arm_angle)
+        D1 = about(rot_between(pl - pu, np.array([sx * np.sin(a), -np.cos(a), 0.0])), pu)
         for i in range(len(W)):
             if under(parent, i, up): W[i] = D1 @ world[i]
         pl2 = (D1 @ np.append(pl, 1))[:3]; ph2 = (D1 @ np.append(ph, 1))[:3]
-        D2 = about(rot_between(ph2 - pl2, np.array([sx * 0.1, -1.0, 0.0])), pl2)
+        D2 = about(rot_between(ph2 - pl2, np.array([sx * 0.1, -0.2, 1.0])), pl2)
+        ph2 = (D2 @ np.append(ph2, 1))[:3]   # wrist after the elbow bend
         # Anatomical position: roll the forearm so the thumb points outward, which turns the palm forward.
         k = (ph2 - pl2) / np.linalg.norm(ph2 - pl2)
         # The hand continues the line of the forearm (straight wrist).
@@ -244,7 +246,7 @@ def main():
     ap.add_argument('--smooth', type=int, default=6)
     ap.add_argument('--shape', type=int, default=1)
     ap.add_argument('--pose', type=int, default=1)
-    ap.add_argument('--side-bias', type=float, default=0.3)
+    ap.add_argument('--arm-angle', type=float, default=45.0)
     ap.add_argument('--smooth-surface', type=int, default=6)
     args = ap.parse_args()
     j, bufs = load(args.src)
@@ -256,7 +258,7 @@ def main():
     IBM = accessor(j, bufs, skel['inverseBindMatrices']).reshape(-1, 4, 4).transpose(0, 2, 1)
     rest = np.stack([world[n] @ IBM[k] for k, n in enumerate(joints)])
     print('rest skin deviation from identity', round(float(np.abs(rest - np.eye(4)).max()), 6))
-    posed_world = arm_pose(world, parent, names, args.side_bias) if args.pose else world
+    posed_world = arm_pose(world, parent, names, args.arm_angle) if args.pose else world
     SM = np.stack([posed_world[n] @ IBM[k] for k, n in enumerate(joints)])
 
     parts = []
@@ -276,7 +278,7 @@ def main():
     body = [pp for pp in parts if not pp[3].startswith(DROP_MATERIALS)]
     eyes = [pp for pp in parts if 'eye' in pp[3].lower()]
     posed = [skin_points(pp[0], pp[5], pp[6], SM) if args.pose else pp[0] for pp in body]
-    allP = np.vstack(posed)
+    allP = np.vstack([pp[0] for pp in body])   # bounds from the rest pose, so region thresholds do not move with the arms
     flip = False
     if eyes:
         flip = np.vstack([e[0] for e in eyes])[:, 2].mean() < np.vstack([pp[0] for pp in body])[:, 2].mean()
@@ -335,7 +337,7 @@ def main():
         f.write(seam_pos.astype(np.float32).ravel().tobytes())
     meta = {'format': 'v4', 'totalVertices': total, 'normalsOffset': total * 12, 'shadeOffset': total * 24,
             'uvOffset': total * 28, 'indexOffset': total * 36, 'groups': meta_groups, 'units': 'meters',
-            'upAxis': 'y', 'frontAxis': '+z', 'height': args.height, 'pose': 'anatomical position' if args.pose else 'rest',
+            'upAxis': 'y', 'frontAxis': '+z', 'height': args.height, 'pose': 'arms out, elbows bent, forearms forward' if args.pose else 'rest',
             'seamSegments': int(len(seam_pos)),
             'source': 'Universal Base Characters by Quaternius (CC0), converted by convert_rigged.py'}
     json.dump(meta, open(os.path.join(args.out, 'body.json'), 'w'), indent=1)
