@@ -56,9 +56,9 @@
   function loadModel() {
     if (!modelPromise) {
       modelPromise = Promise.all([
-        fetch('model/body.json').then((r) => { if (!r.ok) throw new Error('model json'); return r.json(); }),
-        fetch('model/body.bin').then((r) => { if (!r.ok) throw new Error('model bin'); return r.arrayBuffer(); }),
-        fetch('model/seams.bin').then((r) => { if (!r.ok) throw new Error('model seams'); return r.arrayBuffer(); }),
+        fetch('model/body.json?v=18').then((r) => { if (!r.ok) throw new Error('model json'); return r.json(); }),
+        fetch('model/body.bin?v=18').then((r) => { if (!r.ok) throw new Error('model bin'); return r.arrayBuffer(); }),
+        fetch('model/seams.bin?v=18').then((r) => { if (!r.ok) throw new Error('model seams'); return r.arrayBuffer(); }),
       ]).then(([meta, buf, seamBuf]) => {
         if (meta.format !== 'v4') throw new Error('model format');
         const total = meta.totalVertices;
