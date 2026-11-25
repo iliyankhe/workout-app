@@ -599,14 +599,15 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v26';
+  const APP_VERSION = 'v27';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
     'For exercises, use names exactly as they appear in the attached exercise-names.txt list.',
     '',
     'Workout plan format:',
-    '{"type":"workout_plan","version":1,"name":"...","days":[{"day":"Mon","title":"Upper A","exercises":[{"exercise":"Barbell Bench Press - Medium Grip","sets":4,"reps":"6-8","rest_sec":120,"notes":""}]}]}',
+    '{"type":"workout_plan","version":1,"name":"...","days":[{"day":"Mon","title":"Upper A","exercises":[{"exercise":"Barbell Bench Press - Medium Grip","sets":4,"reps":"6-8","rest_sec":120,"target_lb":135,"notes":""}]}]}',
+    '"target_lb" is the weight to lift, in pounds. Leave it out if you do not know it.',
     '',
     'Meal plan format (grams only, amount_g is required):',
     '{"type":"meal_plan","version":1,"days":[{"date":"2026-11-25","meals":[{"name":"Oatmeal","servings":1,"ingredients":[{"name":"rolled oats","amount_g":80}]}]}]}',
@@ -628,6 +629,10 @@
       '<textarea id="prompt-text" readonly>' + esc(PROMPT) + '</textarea>' +
       '<div class="row" style="margin-top:8px"><button data-copy="prompt-text">Copy prompt</button>' +
       '<a class="btn" href="exercise-names.txt" download>Download exercise-names.txt</a></div></div>' +
+      '<h2>Get next weights from Claude</h2><div class="card">' +
+      '<p class="muted">Copies your last 14 days of sets and current targets. Paste it into Claude. Claude replies with the plan and a target weight for each lift. Copy that reply and paste it into Import workout above.</p>' +
+      '<div class="row"><button class="primary" data-training-log="1">Copy training log</button></div>' +
+      '<div id="log-box"></div></div>' +
       '<h2>Backup</h2><div class="card">' +
       '<p class="muted">Save a backup file to iCloud Drive from the share sheet (Save to Files).</p>' +
       '<div class="row"><button class="primary" data-backup="export">Export backup</button>' +
@@ -734,6 +739,15 @@
     if (t.dataset.unhave) {
       state.pantry = state.pantry.filter((k) => k !== t.dataset.unhave);
       save(); render(); return;
+    }
+    if (t.dataset.trainingLog) {
+      if (!state.workoutPlan) { toast('Import a workout plan first.', 'err'); return; }
+      const text = JSON.stringify(L.buildFeedback(state.workoutPlan, state.logs, todayISO(), 14, exName), null, 1);
+      const box = document.getElementById('log-box');
+      if (box) box.innerHTML = '<textarea id="log-text" readonly style="min-height:120px">' + esc(text) + '</textarea>' +
+        '<div class="row" style="margin-top:8px"><button data-copy="log-text">Copy log</button></div>';
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast('Training log copied.', 'ok'), () => toast('Tap Copy log below.'));
+      return;
     }
     if (t.dataset.copy) {
       const el = document.getElementById(t.dataset.copy);

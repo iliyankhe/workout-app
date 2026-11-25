@@ -145,11 +145,14 @@
         }
         const sets = Number(ex.sets);
         if (!(sets > 0)) errors.push(tag + ': "sets" must be a number above 0.');
+        const tgt = ex.target_lb == null || ex.target_lb === '' ? null : Number(ex.target_lb);
+        if (tgt !== null && !(tgt > 0)) warnings.push(tag + ': "target_lb" should be a weight above 0, so it was ignored.');
         return {
           exercise_id: id,
           sets: sets || 0,
           reps: ex.reps == null ? '' : String(ex.reps),
           rest_sec: ex.rest_sec == null ? null : Number(ex.rest_sec),
+          target_lb: tgt > 0 ? tgt : null,
           notes: ex.notes || '',
         };
       });
@@ -397,8 +400,47 @@
     return { from: a, to: b, change: b.topWeight - a.topWeight };
   }
 
+  // ---- Training log for Claude ----------------------------------------------
+  // What Claude needs to set next weights: the plan's lifts with their current targets and rep ranges,
+  // and every logged session in the window. Names match exercise-names.txt so the reply imports cleanly.
+  function buildFeedback(workoutPlan, logs, todayISO, days, nameOf) {
+    const from = shiftISO(todayISO, -((days || 14) - 1));
+    const plan = workoutPlan || { name: '', days: [] };
+    const sessions = (logs || [])
+      .filter((l) => l.date >= from && l.date <= todayISO)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((l) => ({
+        date: l.date,
+        day: l.day,
+        lifts: (l.entries || []).filter((e) => (e.sets || []).length).map((e) => ({
+          exercise: nameOf(e.exercise_id),
+          sets: e.sets.map((s) => ({ reps: s.reps, weight_lb: s.weight_lb })),
+        })),
+      }))
+      .filter((s) => s.lifts.length);
+    return {
+      type: 'training_log',
+      version: 1,
+      from,
+      to: todayISO,
+      plan_name: plan.name,
+      plan: plan.days.map((d) => ({
+        day: d.day,
+        title: d.title,
+        exercises: d.exercises.map((ex) => ({
+          exercise: nameOf(ex.exercise_id),
+          sets: ex.sets,
+          reps: ex.reps,
+          target_lb: ex.target_lb == null ? null : ex.target_lb,
+        })),
+      })),
+      sessions,
+      ask: 'Reply with only a workout_plan JSON in the same format as the plan, with target_lb set to the weight I should lift next for each lift. Base each target on my sessions: if I hit the top of the rep range on every set, go up a small step; if I fell short, hold or go down. Keep the same days, exercises and names.',
+    };
+  }
+
   const api = {
-    G_PER_OZ, G_PER_LB, ML_PER_CUP, ML_PER_TBSP, ML_PER_TSP,
+    buildFeedback, G_PER_OZ, G_PER_LB, ML_PER_CUP, ML_PER_TBSP, ML_PER_TSP,
     DENSITY_G_PER_CUP, densityFor, convertGrams, formatAmount, normalizeName,
     sectionFor, buildLibraryIndex, resolveExercise,
     validateWorkoutPlan, validateMealPlan,
