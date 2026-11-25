@@ -1,9 +1,10 @@
 {
- "format": "v3",
- "totalVertices": 9230,
- "normalsOffset": 110760,
- "shadeOffset": 221520,
- "indexOffset": 258440,
+ "format": "v4",
+ "totalVertices": 8026,
+ "normalsOffset": 96312,
+ "shadeOffset": 192624,
+ "uvOffset": 224728,
+ "indexOffset": 288936,
  "groups": [
   {
    "region": "abs",
@@ -50,50 +51,50 @@
   {
    "region": "hamstrings",
    "vStart": 1866,
-   "vCount": 344,
+   "vCount": 304,
    "iStart": 8460,
-   "iCount": 1560
+   "iCount": 1362
   },
   {
    "region": "neck",
-   "vStart": 2210,
+   "vStart": 2170,
    "vCount": 247,
-   "iStart": 10020,
+   "iStart": 9822,
    "iCount": 1068
   },
   {
    "region": "quads",
-   "vStart": 2457,
-   "vCount": 250,
-   "iStart": 11088,
-   "iCount": 966
+   "vStart": 2417,
+   "vCount": 288,
+   "iStart": 10890,
+   "iCount": 1164
   },
   {
    "region": "shoulders",
-   "vStart": 2707,
+   "vStart": 2705,
    "vCount": 451,
    "iStart": 12054,
    "iCount": 1872
   },
   {
    "region": "skin",
-   "vStart": 3158,
-   "vCount": 5614,
+   "vStart": 3156,
+   "vCount": 4412,
    "iStart": 13926,
-   "iCount": 26916
+   "iCount": 21660
   },
   {
    "region": "triceps",
-   "vStart": 8772,
+   "vStart": 7568,
    "vCount": 98,
-   "iStart": 40842,
+   "iStart": 35586,
    "iCount": 366
   },
   {
    "region": "upper_back",
-   "vStart": 8870,
+   "vStart": 7666,
    "vCount": 360,
-   "iStart": 41208,
+   "iStart": 35952,
    "iCount": 1746
   }
  ],

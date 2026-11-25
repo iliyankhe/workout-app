@@ -320,6 +320,24 @@
     return out;
   }
 
+  // Estimated soreness from completed workouts. Sets count most 1 day after training and
+  // less on the days either side. Returns { region: { level: 1-3, score } } for muscles that are sore.
+  function autoSoreness(logs, exercises, todayISO) {
+    const WEIGHT = [0, 1.0, 0.7, 0.3]; // age in days: 0 (today, no soreness yet), 1, 2, 3
+    const score = {};
+    for (let age = 0; age < WEIGHT.length; age++) {
+      const day = shiftISO(todayISO, -age);
+      const load = weeklyLoad(logs.filter((l) => l.date === day), exercises, day, 1);
+      for (const [region, sets] of Object.entries(load)) score[region] = (score[region] || 0) + sets * WEIGHT[age];
+    }
+    const out = {};
+    for (const [region, s] of Object.entries(score)) {
+      const level = s >= 10 ? 3 : s >= 5 ? 2 : s >= 1.5 ? 1 : 0;
+      if (level) out[region] = { level, score: Math.round(s * 10) / 10 };
+    }
+    return out;
+  }
+
   function shiftISO(iso, days) {
     const [y, m, d] = iso.split('-').map(Number);
     const dt = new Date(Date.UTC(y, m - 1, d + days));
@@ -364,7 +382,7 @@
     sectionFor, buildLibraryIndex, resolveExercise,
     validateWorkoutPlan, validateMealPlan,
     buildShoppingList, exerciseHistory, compareSessions, cooldownFor, warmupFor,
-    REGION_OF, weeklyLoad, latestSoreness, shiftISO,
+    REGION_OF, weeklyLoad, latestSoreness, autoSoreness, shiftISO,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

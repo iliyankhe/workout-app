@@ -58,17 +58,25 @@
         fetch('model/body.json').then((r) => { if (!r.ok) throw new Error('model json'); return r.json(); }),
         fetch('model/body.bin').then((r) => { if (!r.ok) throw new Error('model bin'); return r.arrayBuffer(); }),
       ]).then(([meta, buf]) => {
-        if (meta.format !== 'v3') throw new Error('model format');
+        if (meta.format !== 'v4') throw new Error('model format');
         const total = meta.totalVertices;
         const positions = new Float32Array(buf, 0, total * 3);
         const normals = new Float32Array(buf, meta.normalsOffset, total * 3);
         const shade = new Float32Array(buf, meta.shadeOffset, total);
+        const uvs = new Float32Array(buf, meta.uvOffset, total * 2);
+        const loader = new THREE.TextureLoader();
+        const colorTex = loader.load('model/body_color.jpg');
+        colorTex.flipY = false; // glTF texture coordinates
+        colorTex.colorSpace = THREE.SRGBColorSpace;
+        const normalTex = loader.load('model/body_normal.jpg');
+        normalTex.flipY = false;
         const group = new THREE.Group();
         const meshes = [];
         for (const g of meta.groups) {
           const geom = new THREE.BufferGeometry();
           geom.setAttribute('position', new THREE.BufferAttribute(positions.subarray(g.vStart * 3, (g.vStart + g.vCount) * 3), 3));
           geom.setAttribute('normal', new THREE.BufferAttribute(normals.subarray(g.vStart * 3, (g.vStart + g.vCount) * 3), 3));
+          geom.setAttribute('uv', new THREE.BufferAttribute(uvs.subarray(g.vStart * 2, (g.vStart + g.vCount) * 2), 2));
           const colors = new Float32Array(g.vCount * 3);
           for (let i = 0; i < g.vCount; i++) {
             const v = shade[g.vStart + i];
@@ -77,13 +85,15 @@
           geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
           geom.setIndex(new THREE.BufferAttribute(new Uint32Array(buf, meta.indexOffset + g.iStart * 4, g.iCount), 1));
           const unmapped = g.region === 'skin' || g.region === 'other';
-          const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ color: unmapped ? SKIN : BASE, vertexColors: true, roughness: 0.7, metalness: 0.0 }));
+          const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({
+            color: 0xffffff, map: colorTex, normalMap: normalTex, roughness: 0.7, metalness: 0.0, vertexColors: true,
+          }));
           mesh.userData.region = unmapped ? null : g.region;
-          mesh.userData.base = unmapped ? SKIN : BASE;
+          mesh.userData.base = BASE;
           group.add(mesh);
           if (!unmapped) meshes.push(mesh);
         }
-        return { group, meshes, source: 'model' };
+        return { group, meshes, source: 'model', colorTex, normalTex };
       });
     }
     return modelPromise;
@@ -160,6 +170,7 @@
       fig.group.add(part.group);
       fig.meshes = part.meshes;
       fig.allMeshes = part.group.children;
+      fig.colorTex = part.colorTex; fig.normalTex = part.normalTex;
       if (inst && inst.state.opts) inst.paint(inst.state.opts);
     };
     loadModel().then(attach).catch(() => attach(buildFigure()));
@@ -234,9 +245,19 @@
     });
     canvas.addEventListener('pointercancel', () => { state.down = null; });
 
+    // Figure mode shows the textured body. Training and Soreness show flat region colours.
     function paint(opts) {
-      for (const m of fig.meshes) m.material.color.setHex(colorFor(m.userData.region, opts));
-      for (const m of fig.allMeshes || []) if (!m.userData.region) m.material.color.setHex(m.userData.base);
+      const textured = opts.mode === 'plain';
+      for (const m of fig.allMeshes || []) {
+        const mat = m.material;
+        const map = textured ? (fig.colorTex || null) : null;
+        const normal = textured ? (fig.normalTex || null) : null;
+        if (mat.map !== map || mat.normalMap !== normal) {
+          mat.map = map; mat.normalMap = normal; mat.needsUpdate = true;
+        }
+        if (textured) mat.color.setHex(0xffffff);
+        else mat.color.setHex(m.userData.region ? colorFor(m.userData.region, opts) : SKIN);
+      }
     }
 
     let raf = null;

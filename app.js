@@ -336,7 +336,7 @@
 
   function renderBody() {
     const load = L.weeklyLoad(state.logs, exercises, todayISO(), 7);
-    const sore = L.latestSoreness(state.soreness, todayISO(), 3);
+    const sore = L.autoSoreness(state.logs, exercises, todayISO());
     const chip = (k, label) => '<button class="chip ' + (bodyMode === k ? 'on' : '') + '" data-bodymode="' + k + '">' + label + '</button>';
     view.innerHTML =
       '<div class="row" style="margin-bottom:8px">' + chip('figure', 'Figure') + chip('heat', 'Training') + chip('sore', 'Soreness') + '</div>' +
@@ -368,11 +368,12 @@
       const levels = ['', 'Mild', 'Moderate', 'Severe'];
       const colors = ['', '#f0b429', '#f0893b', '#ef4444'];
       const rows = Object.entries(sore).filter(([, s]) => s && s.level > 0).sort((a, b) => b[1].level - a[1].level);
-      el.innerHTML = '<div class="card"><h3>Soreness, last 3 days</h3>' +
+      el.innerHTML = '<div class="card"><h3>Soreness (estimated)</h3>' +
+        '<p class="muted">Worked out automatically from your completed workouts. Muscles trained one day ago are the most sore, and the effect fades after three days.</p>' +
         [1, 2, 3].map((i) => '<span class="swatch" style="background:' + colors[i] + '"></span>' + levels[i]).join('&nbsp;&nbsp;&nbsp;') +
         (rows.length
           ? rows.map(([r, s]) => '<div class="row"><span>' + name(r) + '</span><span style="margin-left:auto">' + levels[s.level] + '</span></div>').join('')
-          : '<p class="muted">No soreness logged in the last 3 days.</p>') +
+          : '<p class="muted">No soreness estimated right now.</p>') +
         '</div>';
     } else {
       el.innerHTML = '';
@@ -382,14 +383,11 @@
   function showRegion(region, load, sore) {
     const panel = document.getElementById('body-panel');
     if (!panel) return;
-    const today = todayISO();
-    const cur = (state.soreness[today] || {})[region] || 0;
     const levels = ['None', 'Mild', 'Moderate', 'Severe'];
+    const level = sore[region] ? sore[region].level : 0;
     panel.innerHTML = '<div class="card"><h3>' + esc(REGION_NAMES[region] || region) + '</h3>' +
       '<p class="muted">Sets in the last 7 days: ' + (load[region] || 0) + '</p>' +
-      '<label>Soreness today</label><div class="row">' +
-      levels.map((l, i) => '<button class="chip ' + (cur === i ? 'on' : '') + '" data-region="' + region + '" data-soreness="' + i + '">' + l + '</button>').join('') +
-      '</div></div>';
+      '<p class="muted">Estimated soreness: ' + levels[level] + '</p></div>';
   }
 
   // Import & backup --------------------------------------------------------
