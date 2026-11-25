@@ -807,6 +807,20 @@
     .then((data) => {
       exercises = data;
       index = L.buildLibraryIndex(exercises);
+      // First open with no workout plan: load the starter plan once. Plans already on the device are never replaced.
+      if (!state.workoutPlan && !state.starterSeen) {
+        fetch('data/starter_plan.json')
+          .then((r) => r.json())
+          .then((obj) => {
+            state.starterSeen = true;
+            const r = L.validateWorkoutPlan(obj, index);
+            if (r.ok && !state.workoutPlan) { state.workoutPlan = r.plan; selectedDay = 0; toast('Starter workout loaded. Replace or import your own in Import.', 'ok'); }
+            save();
+            render();
+          })
+          .catch(() => { render(); });
+        return;
+      }
       render();
     })
     .catch(() => { view.innerHTML = '<div class="msg err">Could not load the exercise library.</div>'; });

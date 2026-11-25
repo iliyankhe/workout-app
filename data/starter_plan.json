@@ -1,0 +1,155 @@
+{
+  "type": "workout_plan",
+  "version": 1,
+  "name": "Push Pull Legs (school gym, machines)",
+  "cooldown": {
+    "enabled": true,
+    "hold_sec": 30
+  },
+  "days": [
+    {
+      "day": "Mon",
+      "title": "Push",
+      "exercises": [
+        {
+          "exercise": "Barbell Bench Press - Medium Grip",
+          "sets": 4,
+          "reps": "6-8",
+          "rest_sec": 120,
+          "notes": "Stop 1-2 reps short of failure"
+        },
+        {
+          "exercise": "Incline Dumbbell Press",
+          "sets": 3,
+          "reps": "8-10",
+          "rest_sec": 90,
+          "notes": ""
+        },
+        {
+          "exercise": "Cable Crossover",
+          "sets": 3,
+          "reps": "12-15",
+          "rest_sec": 60,
+          "notes": ""
+        },
+        {
+          "exercise": "Dumbbell Shoulder Press",
+          "sets": 3,
+          "reps": "8-10",
+          "rest_sec": 90,
+          "notes": ""
+        },
+        {
+          "exercise": "Side Lateral Raise",
+          "sets": 3,
+          "reps": "12-15",
+          "rest_sec": 60,
+          "notes": ""
+        },
+        {
+          "exercise": "Triceps Pushdown - Rope Attachment",
+          "sets": 3,
+          "reps": "10-12",
+          "rest_sec": 60,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "day": "Wed",
+      "title": "Pull",
+      "exercises": [
+        {
+          "exercise": "Wide-Grip Lat Pulldown",
+          "sets": 4,
+          "reps": "8-10",
+          "rest_sec": 90,
+          "notes": ""
+        },
+        {
+          "exercise": "Seated Cable Rows",
+          "sets": 3,
+          "reps": "10-12",
+          "rest_sec": 90,
+          "notes": ""
+        },
+        {
+          "exercise": "Face Pull",
+          "sets": 3,
+          "reps": "12-15",
+          "rest_sec": 60,
+          "notes": ""
+        },
+        {
+          "exercise": "Straight-Arm Dumbbell Pullover",
+          "sets": 2,
+          "reps": "12",
+          "rest_sec": 60,
+          "notes": ""
+        },
+        {
+          "exercise": "Barbell Curl",
+          "sets": 3,
+          "reps": "8-10",
+          "rest_sec": 60,
+          "notes": ""
+        },
+        {
+          "exercise": "Hammer Curls",
+          "sets": 2,
+          "reps": "10-12",
+          "rest_sec": 60,
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "day": "Fri",
+      "title": "Legs (no running or jumping)",
+      "exercises": [
+        {
+          "exercise": "Leg Press",
+          "sets": 4,
+          "reps": "10-12",
+          "rest_sec": 120,
+          "notes": "Feet shoulder width"
+        },
+        {
+          "exercise": "Romanian Deadlift",
+          "sets": 3,
+          "reps": "8-10",
+          "rest_sec": 120,
+          "notes": ""
+        },
+        {
+          "exercise": "Lying Leg Curls",
+          "sets": 3,
+          "reps": "10-12",
+          "rest_sec": 90,
+          "notes": ""
+        },
+        {
+          "exercise": "Leg Extensions",
+          "sets": 3,
+          "reps": "12-15",
+          "rest_sec": 60,
+          "notes": ""
+        },
+        {
+          "exercise": "Barbell Hip Thrust",
+          "sets": 3,
+          "reps": "8-10",
+          "rest_sec": 90,
+          "notes": ""
+        },
+        {
+          "exercise": "Seated Calf Raise",
+          "sets": 3,
+          "reps": "12-15",
+          "rest_sec": 60,
+          "notes": "Slow reps, pause at the bottom"
+        }
+      ]
+    }
+  ]
+}

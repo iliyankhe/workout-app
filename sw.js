@@ -1,9 +1,9 @@
 // Offline support.
 // App code (HTML, CSS, JS, data) is fetched from the network first, so updates show up on the next load.
 // Falls back to the cached copy when offline. Exercise images are cached as they are viewed.
-const CACHE = 'workout-app-v22';
+const CACHE = 'workout-app-v23';
 const SHELL = ['./', 'index.html', 'styles.css', 'lib.js', 'body.js', 'app.js', 'vendor/three.min.js', 'manifest.webmanifest',
-  'data/exercises.json', 'exercise-names.txt', 'icons/icon-192.png', 'icons/icon-512.png'];
+  'data/exercises.json', 'data/starter_plan.json', 'exercise-names.txt', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
