@@ -369,8 +369,12 @@
     const selected = state.progressEx && index.byId.has(state.progressEx) ? state.progressEx : ids[0];
     const rows = L.exerciseHistory(state.logs, selected);
     const maxW = Math.max(1, ...rows.map((r) => r.topWeight));
-    let html = '<label>Exercise (type a name)</label>' +
-      '<input id="prog-type" list="prog-names" value="' + esc(exName(selected)) + '" placeholder="e.g. Bench Press">' +
+    // Dropdown lists the exercises you have logged. The typing box finds any exercise in the library.
+    const listed = ids.includes(selected) ? ids : [selected].concat(ids);
+    let html = '<label>Pick a logged exercise</label>' +
+      '<select id="prog-ex">' + listed.map((id) => '<option value="' + esc(id) + '"' + (id === selected ? ' selected' : '') + '>' + esc(exName(id)) + '</option>').join('') + '</select>' +
+      '<label>Or type any exercise</label>' +
+      '<input id="prog-type" list="prog-names" placeholder="e.g. Bench Press">' +
       '<datalist id="prog-names">' + exercises.map((e) => '<option value="' + esc(e.name) + '">').join('') + '</datalist>';
     html += '<h2>Weight lifted over time</h2><div class="card">';
     if (!rows.length) html += '<p class="muted">No saved sets for this exercise yet.</p>';
@@ -612,7 +616,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v31';
+  const APP_VERSION = 'v32';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -830,6 +834,7 @@
     if (t.id === 'meal-unit') { mealUnit = t.value; state.mealUnit = mealUnit; save(); renderMeals(); return; }
     if (t.id === 'shop-unit') { mealUnit = t.value; state.mealUnit = mealUnit; save(); renderShopping(); return; }
     if (t.dataset.check) { state.checked[t.dataset.check] = t.checked; save(); renderShopping(); return; }
+    if (t.id === 'prog-ex') { state.progressEx = t.value; save(); renderProgress(); return; }
     if (t.id === 'prog-type') {
       const id = index.byName.get(L.normalizeName(t.value));
       if (!id) { toast('No exercise called "' + t.value + '". Pick one from the suggestions.', 'err'); return; }
