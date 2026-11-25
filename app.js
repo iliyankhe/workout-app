@@ -612,7 +612,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v30';
+  const APP_VERSION = 'v31';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -650,7 +650,8 @@
       '<p class="muted">Save a backup file to iCloud Drive from the share sheet (Save to Files).</p>' +
       '<div class="row"><button class="primary" data-backup="export">Export backup</button>' +
       '<label class="btn" style="margin:0">Restore backup<input type="file" accept="application/json,.json" data-file="backup" hidden></label></div>' +
-      '<div class="row" style="margin-top:12px"><button class="bad" style="color:var(--bad)" data-backup="clear">Erase all data on this phone</button></div></div>' +
+      '<div class="row" style="margin-top:12px"><button data-backup="clear-logs">Clear saved workouts</button>' +
+      '<button class="bad" style="color:var(--bad)" data-backup="clear">Erase all data on this phone</button></div></div>' +
       '<div id="backup-box"></div><div id="import-msgs"></div>';
   }
 
@@ -778,6 +779,13 @@
           '<div class="row" style="margin-top:8px"><button data-copy="backup-text">Copy backup</button></div>';
       }
       try { download('workout-backup-' + todayISO() + '.json', text); } catch (e) { /* downloads may be blocked */ }
+      return;
+    }
+    if (t.dataset.backup === 'clear-logs') {
+      // Removes saved workouts and in-progress entries only. Plans, meals and the pantry stay.
+      if (confirm('Delete all saved workouts on this phone? Your plans and meals stay. Export a backup first if you want to keep them.')) {
+        state.logs = []; state.drafts = {}; save(); render(); toast('Saved workouts cleared.', 'ok');
+      }
       return;
     }
     if (t.dataset.backup === 'clear') {
