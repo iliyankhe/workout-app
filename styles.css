@@ -105,3 +105,7 @@ td.num, th.num { text-align: right; }
 .lift details li { margin-bottom: 4px; }
 .lift th { font-size: 12px; color: var(--muted); font-weight: 500; text-align: left; padding-bottom: 4px; }
 .lift.done strong { text-decoration: line-through; color: var(--muted); }
+
+/* Ticked sets */
+.lift tr.done td:first-child { color: var(--muted); }
+.lift tr.done td:first-child label { text-decoration: line-through; }

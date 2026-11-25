@@ -199,17 +199,20 @@
       (ex.rest_sec ? ' · rest ' + esc(ex.rest_sec) + 's' : '') +
       (hasLast ? ' · last ' + esc(last) + ' lb' : '');
     let rows = '';
+    let ticked = 0;
     for (let s = 0; s < ex.sets; s++) {
       const key = ex.exercise_id + '|' + s;
       const repsV = d[key + '|reps'] != null ? d[key + '|reps'] : (parseInt(ex.reps, 10) || '');
       const wV = d[key + '|weight_lb'] != null ? d[key + '|weight_lb'] : (ex.target_lb != null ? ex.target_lb : (hasLast ? last : ''));
-      rows += '<tr><td>Set ' + (s + 1) + '</td>' +
+      const done = !!d[key + '|done'];
+      if (done) ticked++;
+      rows += '<tr class="' + (done ? 'done' : '') + '"><td><label class="check" style="margin:0"><input type="checkbox" data-done="' + esc(key) + '" ' + (done ? 'checked' : '') + '> Set ' + (s + 1) + '</label></td>' +
         '<td><input class="num" inputmode="numeric" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="reps" value="' + esc(repsV) + '" placeholder="reps"></td>' +
         '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(wV) + '" placeholder="lb"></td>' +
         '<td><button class="chip" data-timer="' + rest + '" data-label="' + esc(exName(ex.exercise_id)) + ' rest">Rest ' + esc(rest) + 's</button></td></tr>';
     }
     const muscles = e ? [].concat(e.primaryMuscles, e.secondaryMuscles).map((m) => '<span class="pill">' + esc(m) + '</span>').join('') : '';
-    return '<div class="lift">' +
+    return '<div class="lift' + (ex.sets && ticked === ex.sets ? ' done' : '') + '">' +
       '<div><strong>' + (i + 1) + '. ' + esc(e ? e.name : ex.exercise_id) + '</strong></div>' +
       '<div class="meta">' + meta + '</div>' +
       (ex.notes ? '<div class="meta">' + esc(ex.notes) + '</div>' : '') +
@@ -599,7 +602,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v27';
+  const APP_VERSION = 'v28';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -781,6 +784,17 @@
 
   view.addEventListener('change', (ev) => {
     const t = ev.target;
+    if (t.dataset.done) {
+      // Ticking a set saves with the session draft and marks the lift done once every set is ticked.
+      const day = state.workoutPlan.days[selectedDay];
+      draftFor(day.title)[t.dataset.done + '|done'] = t.checked;
+      save();
+      const row = t.closest('tr');
+      if (row) row.classList.toggle('done', t.checked);
+      const lift = t.closest('.lift');
+      if (lift) lift.classList.toggle('done', [...lift.querySelectorAll('input[data-done]')].every((x) => x.checked));
+      return;
+    }
     if (t.dataset.target) {
       const day = state.workoutPlan.days[selectedDay];
       const ex = day.exercises.find((x) => x.exercise_id === t.dataset.target);
