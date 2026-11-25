@@ -54,16 +54,86 @@ def region_of(bone, p, height, zc=0.0):
     if 'calf' in n: return 'calves'
     if 'pelvis' in n:
         if z < 0: return 'glutes'
-        return 'abs' if f > 0.5 else 'skin'
+        if f > 0.45: return 'obliques' if abs(x) > 0.1 else 'abs'
+        return 'skin'
     if 'spine' in n:
-        if z > 0: return 'chest' if f > 0.6 else 'abs'
-        return 'upper_back' if f > 0.6 else 'lower_back'
+        # Front: pecs above the sternum, abs in the middle, obliques at the sides of the waist.
+        if z > 0:
+            if f > 0.62: return 'chest'
+            if f > 0.5 and abs(x) > 0.085: return 'obliques'
+            return 'abs'
+        # Back: traps and upper back, lats at the sides, lower back along the spine.
+        if abs(x) < 0.1 and f > 0.7: return 'upper_back'
+        if abs(x) < 0.08: return 'upper_back' if f > 0.5 else 'lower_back'
+        return 'lats' if f > 0.46 else 'lower_back'
     return 'skin'
+
+def shape(Q, vreg, height):
+    """Proportions only: fuller chest, broader shoulders and lats, narrower waist, firmer abs.
+    Applied after the regions are chosen, so the region borders stay where they were."""
+    out = Q.copy()
+    f = Q[:, 1] / height
+    m = vreg == 'chest'; out[m, 2] += 0.012
+    m = vreg == 'abs'; out[m, 2] += 0.006
+    m = vreg == 'shoulders'; out[m, 0] *= 1.08
+    m = vreg == 'lats'; out[m, 0] *= 1.05
+    m = np.isin(vreg, ['obliques', 'abs', 'lower_back']) & (f > 0.42) & (f < 0.66)
+    out[m, 0] *= 0.93
+    return out
+
+def smooth_labels(labels, idx, n, iters=6):
+    """Majority vote over each vertex and its neighbours, so region borders become smooth curves
+    instead of following the jagged weight boundaries."""
+    import scipy.sparse as sp
+    names, lab = np.unique(labels, return_inverse=True)
+    R = len(names)
+    e = np.concatenate([idx[:, [0, 1]], idx[:, [1, 2]], idx[:, [2, 0]]])
+    A = sp.coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(n, n))
+    A = ((A + A.T) > 0).astype(float).tocsr()
+    A = A + sp.identity(n, format='csr') * 1.5          # the vertex itself counts more
+    for _ in range(iters):
+        onehot = sp.csr_matrix((np.ones(n), (np.arange(n), lab)), shape=(n, R))
+        counts = (A @ onehot).toarray()
+        lab = counts.argmax(axis=1)
+    return names[lab]
+
+def seams_of(Q, idx, tri_reg, nrm, iters=15, lift=0.002):
+    """Smooth line segments along edges shared by two triangles of different muscle regions.
+    The seam vertices are averaged with their neighbours along the seam (so the lines are smooth
+    curves, not triangle zigzags), then lifted slightly off the surface."""
+    import scipy.sparse as sp
+    N = len(Q)
+    a = np.concatenate([idx[:, 0], idx[:, 1], idx[:, 2]])
+    b = np.concatenate([idx[:, 1], idx[:, 2], idx[:, 0]])
+    reg = np.concatenate([tri_reg, tri_reg, tri_reg])
+    lo = np.minimum(a, b); hi = np.maximum(a, b)
+    key = lo * N + hi
+    order = np.argsort(key, kind='stable')
+    k = key[order]
+    same = np.where(k[1:] == k[:-1])[0]
+    r1 = reg[order][same]; r2 = reg[order][same + 1]
+    diff = same[r1 != r2]
+    if len(diff) == 0:
+        return np.zeros((0, 2, 3))
+    e_lo = lo[order][diff]; e_hi = hi[order][diff]
+    ids, inv = np.unique(np.concatenate([e_lo, e_hi]), return_inverse=True)
+    m = len(ids)
+    ea = inv[:len(e_lo)]; eb = inv[len(e_lo):]
+    A = sp.coo_matrix((np.ones(2 * len(ea)), (np.concatenate([ea, eb]), np.concatenate([eb, ea]))), shape=(m, m)).tocsr()
+    deg = np.asarray(A.sum(axis=1)).ravel(); deg[deg == 0] = 1
+    An = sp.diags(1.0 / deg) @ A
+    X = Q[ids].copy()
+    for _ in range(iters):
+        X = 0.5 * X + 0.5 * (An @ X)
+    X = X + nrm[ids] * lift
+    return np.stack([X[ea], X[eb]], axis=1)
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('src'); ap.add_argument('--out', default='/home/claude/app/model')
     ap.add_argument('--height', type=float, default=1.76)
+    ap.add_argument('--smooth', type=int, default=6)
+    ap.add_argument('--shape', type=int, default=1)
     args = ap.parse_args()
     j, bufs = load(args.src)
     joints = j['skins'][0]['joints']
@@ -103,15 +173,20 @@ def main():
     ZC = {d: float(np.concatenate(a).mean()) for d, a in zs_all.items()}
 
     groups = {}
+    seam_chunks = []
     for P, idx, dom, mat, UV in body:
         Q = (P - centre) * s
         if flip: Q[:, 0] *= -1; Q[:, 2] *= -1
         vreg = np.array([region_of(bone_names[d], Q[i], args.height, ZC.get(d, 0.0)) for i, d in enumerate(dom)])
+        vreg = smooth_labels(vreg, idx, len(Q), iters=args.smooth)
+        if args.shape: Q = shape(Q, vreg, args.height)
         tri = vreg[idx]
         tri_reg = np.where(tri[:, 1] == tri[:, 2], tri[:, 1], tri[:, 0])
         nrm = np.asarray(trimesh.Trimesh(vertices=Q, faces=idx, process=False).vertex_normals)
+        seam_chunks.append(seams_of(Q, idx, tri_reg, nrm))
         for r in set(tri_reg):
             groups.setdefault(r, []).append((Q, nrm, UV, idx[tri_reg == r]))
+    seam_pos = np.vstack(seam_chunks) if seam_chunks else np.zeros((0, 2, 3))
 
     pos = array.array('f'); nor = array.array('f'); shd = array.array('f'); uvs = array.array('f')
     ind = array.array('I'); meta_groups = []; total = 0
@@ -131,9 +206,12 @@ def main():
     with open(os.path.join(args.out, 'body.bin'), 'wb') as f:
         for chunk in (pos, nor, shd, uvs, ind):
             f.write(chunk.tobytes())
+    with open(os.path.join(args.out, 'seams.bin'), 'wb') as f:
+        f.write(seam_pos.astype(np.float32).ravel().tobytes())
     meta = {'format': 'v4', 'totalVertices': total, 'normalsOffset': total * 12, 'shadeOffset': total * 24,
             'uvOffset': total * 28, 'indexOffset': total * 36, 'groups': meta_groups, 'units': 'meters',
             'upAxis': 'y', 'frontAxis': '+z', 'height': args.height,
+            'seamSegments': int(len(seam_pos)),
             'source': 'Universal Base Characters by Quaternius (CC0), converted by convert_rigged.py'}
     json.dump(meta, open(os.path.join(args.out, 'body.json'), 'w'), indent=1)
     print('flip', flip, 'vertices', total, {g['region']: g['vCount'] for g in meta_groups})

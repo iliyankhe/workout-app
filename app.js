@@ -345,9 +345,9 @@
 
   // Body map ---------------------------------------------------------------
   const REGION_NAMES = {
-    abs: 'Abs', chest: 'Chest', shoulders: 'Shoulders', biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms',
+    abs: 'Abs', chest: 'Chest (pecs)', shoulders: 'Shoulders', biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms',
     quads: 'Quads', hamstrings: 'Hamstrings', glutes: 'Glutes', adductors: 'Inner thigh', calves: 'Calves',
-    lats: 'Lats', upper_back: 'Upper back', lower_back: 'Lower back', neck: 'Neck',
+    lats: 'Lats', obliques: 'Obliques', upper_back: 'Upper back', lower_back: 'Lower back', neck: 'Neck',
   };
   let bodyMounted = false;
 
@@ -374,6 +374,9 @@
     return [...set];
   }
 
+  // The muscle last tapped on the figure, with its tap point. Kept across re-renders.
+  let bodySelected = null;
+
   function renderBody() {
     const load = L.weeklyLoad(state.logs, exercises, todayISO(), 7);
     const sore = soreByRegion();
@@ -381,37 +384,71 @@
     view.innerHTML =
       '<div class="row" style="margin-bottom:8px">' + chip('figure', 'Figure') + chip('heat', 'Training') + chip('sore', 'Soreness') + '</div>' +
       '<div class="card" style="padding:6px;position:relative"><div id="body-canvas" style="height:440px;touch-action:none"></div>' +
-      '<div id="body-label" class="body-label" hidden></div></div>' +
+      '<div id="body-dot" class="body-dot" hidden></div><div id="body-label" class="body-label" hidden></div></div>' +
       '<div id="body-menu"></div>' +
       '<div id="body-panel"></div>' +
-      '<p class="muted">Drag to turn the figure. Tap a muscle to see its sets or log soreness. This is a stylised figure, not medical imaging. If pain is sharp, lasts, or gets worse, see a doctor or physiotherapist.</p>';
+      '<p class="muted">Drag to turn the figure. Tap a muscle to see its sets or log soreness. Tap it again, or tap away from the body, to clear. This is a stylised figure, not medical imaging. If pain is sharp, lasts, or gets worse, see a doctor or physiotherapist.</p>';
     window.BodyMap.render(document.getElementById('body-canvas'), {
       mode: bodyMode === 'figure' ? 'plain' : bodyMode, load, sore,
-      onTap: (region, x, y) => showRegion(region, load, sore, x, y),
+      onTap: (region, x, y) => onBodyTap(region, x, y, load, sore),
     });
+    applyBodySelection(load, sore);
+  }
+
+  // Tapping a muscle selects it; tapping the same muscle, the empty space or skin clears the choice.
+  function onBodyTap(region, x, y, load, sore) {
+    if (!region || (bodySelected && bodySelected.region === region)) bodySelected = null;
+    else bodySelected = { region, x, y };
+    applyBodySelection(load, sore);
+  }
+
+  function applyBodySelection(load, sore) {
     renderBodyMenu(load, sore);
+    const label = document.getElementById('body-label');
+    const dot = document.getElementById('body-dot');
+    const panel = document.getElementById('body-panel');
+    if (!bodySelected) {
+      if (label) label.hidden = true;
+      if (dot) dot.hidden = true;
+      if (panel) panel.innerHTML = '';
+      return;
+    }
+    showRegion(bodySelected.region, load, sore, bodySelected.x, bodySelected.y);
+  }
+
+  // The mode's legend. While a muscle is selected it sits in that muscle's panel, after the name.
+  function bodyLegend() {
+    if (bodyMode === 'heat') {
+      return '<div class="ramp"></div><div class="row muted"><span>Fewer sets</span><span style="margin-left:auto">More sets</span></div>';
+    }
+    if (bodyMode === 'sore') {
+      const levels = ['', 'Mild', 'Moderate', 'Severe'];
+      const colors = ['', '#f0b429', '#f0893b', '#ef4444'];
+      return '<div class="muted">' + [1, 2, 3].map((i) => '<span class="swatch" style="background:' + colors[i] + '"></span>' + levels[i]).join('&nbsp;&nbsp;&nbsp;') + '</div>';
+    }
+    return '';
   }
 
   // Each colouring mode has its own menu: a legend and the muscles it applies to.
+  // Shown only when no muscle is selected; with a selection the legend moves into the panel.
   function renderBodyMenu(load, sore) {
     const el = document.getElementById('body-menu');
     if (!el) return;
+    if (bodySelected) { el.innerHTML = ''; return; }
     const name = (r) => esc(REGION_NAMES[r] || r);
     if (bodyMode === 'heat') {
       const rows = Object.entries(load).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-      el.innerHTML = '<div class="card"><h3>Training, last 7 days</h3>' +
-        '<div class="ramp"></div><div class="row muted"><span>Fewer sets</span><span style="margin-left:auto">More sets</span></div>' +
+      el.innerHTML = '<div class="card"><h3>Training, last 7 days</h3>' + bodyLegend() +
         (rows.length
           ? rows.map(([r, v]) => '<div class="row"><span>' + name(r) + '</span><span style="margin-left:auto">' + v + ' sets</span></div>').join('')
           : '<p class="muted">No sets logged in the last 7 days.</p>') +
         '</div>';
     } else if (bodyMode === 'sore') {
       const levels = ['', 'Mild', 'Moderate', 'Severe'];
-      const colors = ['', '#f0b429', '#f0893b', '#ef4444'];
       const rows = Object.entries(sore).filter(([, s]) => s && s.level > 0).sort((a, b) => b[1].level - a[1].level);
       el.innerHTML = '<div class="card"><h3>Soreness (estimated)</h3>' +
         '<p class="muted">Worked out automatically from your completed workouts. Muscles trained one day ago are the most sore, and the effect fades after three days.</p>' +
-        [1, 2, 3].map((i) => '<span class="swatch" style="background:' + colors[i] + '"></span>' + levels[i]).join('&nbsp;&nbsp;&nbsp;') +
+        bodyLegend() +
         (rows.length
           ? rows.map(([r, s]) => '<div class="row"><span>' + name(r) + '</span><span style="margin-left:auto">' + levels[s.level] + '</span></div>').join('')
           : '<p class="muted">No soreness estimated right now.</p>') +
@@ -424,17 +461,29 @@
   function showRegion(region, load, sore, x, y) {
     const levels = ['None', 'Mild', 'Moderate', 'Severe'];
     const level = sore[region] ? sore[region].level : 0;
+    const canvas = document.getElementById('body-canvas');
+    // Tap points come in canvas coordinates; the label and dot sit in the card around the canvas.
+    const px = x + (canvas ? canvas.offsetLeft : 0);
+    const py = y + (canvas ? canvas.offsetTop : 0);
     const label = document.getElementById('body-label');
-    if (label && x != null) {
+    const dot = document.getElementById('body-dot');
+    if (label && dot && x != null) {
       label.hidden = false;
+      dot.hidden = false;
       label.textContent = (REGION_NAMES[region] || region) + ' · ' + (load[region] || 0) + ' sets · ' + levels[level];
-      label.style.left = Math.max(8, Math.min(x, label.parentNode.clientWidth - 150)) + 'px';
-      label.style.top = Math.max(8, y - 14) + 'px';
+      const W = label.parentNode.clientWidth;
+      const lw = label.offsetWidth || 150;
+      const left = px + 14 + lw > W - 8 ? px - 14 - lw : px + 14;
+      label.style.left = Math.max(8, left) + 'px';
+      label.style.top = Math.max(8, py - 12) + 'px';
+      dot.style.left = px + 'px';
+      dot.style.top = py + 'px';
     }
     const panel = document.getElementById('body-panel');
     if (!panel) return;
     const manual = ((state.soreness || {})[todayISO()] || {})[region];
     panel.innerHTML = '<div class="card"><h3>' + esc(REGION_NAMES[region] || region) + '</h3>' +
+      bodyLegend() +
       '<p class="muted">Sets in the last 7 days: ' + (load[region] || 0) + '</p>' +
       '<p class="muted">Soreness today: ' + levels[level] + (sore[region] && sore[region].source === 'manual' ? ' (entered by you)' : ' (estimated)') + '</p>' +
       soreChips(region, manual) + '</div>';

@@ -83,3 +83,5 @@ td.num, th.num { text-align: right; }
 .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
 .body-label { position: absolute; background: #22232e; border: 1px solid #3a3b4c; border-radius: 8px; padding: 4px 8px; font-size: 13px; white-space: nowrap; pointer-events: none; color: #f2f2f7; }
 .card.warn { border-color: #6b5a2a; background: #2a2416; }
+
+.body-dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #f2f2f7; box-shadow: 0 0 0 3px rgba(242,242,247,.25); pointer-events: none; }

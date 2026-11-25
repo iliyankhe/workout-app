@@ -1,107 +1,121 @@
 {
  "format": "v4",
- "totalVertices": 7944,
- "normalsOffset": 95328,
- "shadeOffset": 190656,
- "uvOffset": 222432,
- "indexOffset": 285984,
+ "totalVertices": 8012,
+ "normalsOffset": 96144,
+ "shadeOffset": 192288,
+ "uvOffset": 224336,
+ "indexOffset": 288432,
  "groups": [
   {
    "region": "abs",
    "vStart": 0,
-   "vCount": 154,
+   "vCount": 119,
    "iStart": 0,
-   "iCount": 546
+   "iCount": 432
   },
   {
    "region": "biceps",
-   "vStart": 154,
+   "vStart": 119,
    "vCount": 134,
-   "iStart": 546,
+   "iStart": 432,
    "iCount": 510
   },
   {
    "region": "calves",
-   "vStart": 288,
+   "vStart": 253,
    "vCount": 640,
-   "iStart": 1056,
+   "iStart": 942,
    "iCount": 3324
   },
   {
    "region": "chest",
-   "vStart": 928,
-   "vCount": 277,
-   "iStart": 4380,
-   "iCount": 1332
+   "vStart": 893,
+   "vCount": 244,
+   "iStart": 4266,
+   "iCount": 1170
   },
   {
    "region": "forearms",
-   "vStart": 1205,
+   "vStart": 1137,
    "vCount": 444,
-   "iStart": 5712,
+   "iStart": 5436,
    "iCount": 2094
   },
   {
    "region": "glutes",
-   "vStart": 1649,
-   "vCount": 191,
-   "iStart": 7806,
-   "iCount": 708
+   "vStart": 1581,
+   "vCount": 183,
+   "iStart": 7530,
+   "iCount": 690
   },
   {
    "region": "hamstrings",
-   "vStart": 1840,
+   "vStart": 1764,
    "vCount": 304,
-   "iStart": 8514,
+   "iStart": 8220,
    "iCount": 1362
   },
   {
+   "region": "lats",
+   "vStart": 2068,
+   "vCount": 228,
+   "iStart": 9582,
+   "iCount": 918
+  },
+  {
    "region": "neck",
-   "vStart": 2144,
+   "vStart": 2296,
    "vCount": 248,
-   "iStart": 9876,
+   "iStart": 10500,
    "iCount": 1068
   },
   {
+   "region": "obliques",
+   "vStart": 2544,
+   "vCount": 102,
+   "iStart": 11568,
+   "iCount": 300
+  },
+  {
    "region": "quads",
-   "vStart": 2392,
-   "vCount": 292,
-   "iStart": 10944,
-   "iCount": 1176
+   "vStart": 2646,
+   "vCount": 290,
+   "iStart": 11868,
+   "iCount": 1170
   },
   {
    "region": "shoulders",
-   "vStart": 2684,
-   "vCount": 451,
-   "iStart": 12120,
-   "iCount": 1866
+   "vStart": 2936,
+   "vCount": 453,
+   "iStart": 13038,
+   "iCount": 1890
   },
   {
    "region": "skin",
-   "vStart": 3135,
+   "vStart": 3389,
    "vCount": 4357,
-   "iStart": 13986,
+   "iStart": 14928,
    "iCount": 21612
   },
   {
    "region": "triceps",
-   "vStart": 7492,
+   "vStart": 7746,
    "vCount": 92,
-   "iStart": 35598,
+   "iStart": 36540,
    "iCount": 342
   },
   {
    "region": "upper_back",
-   "vStart": 7584,
-   "vCount": 360,
-   "iStart": 35940,
-   "iCount": 1758
+   "vStart": 7838,
+   "vCount": 174,
+   "iStart": 36882,
+   "iCount": 816
   }
  ],
  "units": "meters",
  "upAxis": "y",
  "frontAxis": "+z",
  "height": 1.76,
- "seamSegments": 622,
+ "seamSegments": 682,
  "source": "Universal Base Characters by Quaternius (CC0), converted by convert_rigged.py"
 }

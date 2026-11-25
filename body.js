@@ -234,9 +234,9 @@
       ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(ndc, camera);
       const hit = raycaster.intersectObjects(fig.meshes, false)[0];
-      if (hit && hit.object.userData.region && state.opts.onTap) {
-        state.opts.onTap(hit.object.userData.region, e.clientX - rect.left, e.clientY - rect.top);
-      }
+      // Anything that is not a muscle (empty space, skin, joints) is reported as null, so the app can clear its choice.
+      const region = hit && hit.object.userData.region !== 'skin' ? hit.object.userData.region : null;
+      if (state.opts.onTap) state.opts.onTap(region || null, e.clientX - rect.left, e.clientY - rect.top);
     });
     canvas.addEventListener('pointercancel', () => { state.down = null; });
 
