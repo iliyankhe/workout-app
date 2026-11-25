@@ -91,7 +91,7 @@ def about(R, p):
     M = np.eye(4); M[:3, :3] = R; M[:3, 3] = p - R @ p
     return M
 
-def arm_pose(world, parent, names, side_bias=0.0):
+def arm_pose(world, parent, names, side_bias=0.3):
     """Posed world matrices: each upper arm turns down to hang beside the body, and each forearm
     drops with a slight forward bend at the elbow. Everything below a bone moves with it."""
     W = list(world)
@@ -103,7 +103,7 @@ def arm_pose(world, parent, names, side_bias=0.0):
         for i in range(len(W)):
             if under(parent, i, up): W[i] = D1 @ world[i]
         pl2 = (D1 @ np.append(pl, 1))[:3]; ph2 = (D1 @ np.append(ph, 1))[:3]
-        D2 = about(rot_between(ph2 - pl2, np.array([0.0, -1.0, 0.0])), pl2)
+        D2 = about(rot_between(ph2 - pl2, np.array([sx * 0.1, -1.0, 0.0])), pl2)
         # Anatomical position: roll the forearm so the thumb points outward, which turns the palm forward.
         k = (ph2 - pl2) / np.linalg.norm(ph2 - pl2)
         # The hand continues the line of the forearm (straight wrist).
@@ -244,7 +244,7 @@ def main():
     ap.add_argument('--smooth', type=int, default=6)
     ap.add_argument('--shape', type=int, default=1)
     ap.add_argument('--pose', type=int, default=1)
-    ap.add_argument('--side-bias', type=float, default=0.0)
+    ap.add_argument('--side-bias', type=float, default=0.3)
     ap.add_argument('--smooth-surface', type=int, default=6)
     args = ap.parse_args()
     j, bufs = load(args.src)
