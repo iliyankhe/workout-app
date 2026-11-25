@@ -671,7 +671,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.36';
+  const APP_VERSION = 'v1.37';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -684,6 +684,21 @@
     'Meal plan format (grams only, amount_g is required):',
     '{"type":"meal_plan","version":1,"days":[{"date":"2026-11-25","meals":[{"name":"Oatmeal","servings":1,"ingredients":[{"name":"rolled oats","amount_g":80}]}]}]}',
   ].join('\n');
+
+  // Lists each saved workout with its own Delete button (newest first).
+  function savedLogsHTML() {
+    if (!state.logs.length) return '<h2>Saved workouts</h2><div class="card"><p class="muted">No saved workouts yet.</p></div>';
+    const rows = state.logs
+      .map((l, i) => ({ l, i }))
+      .sort((a, b) => (b.l.date || '').localeCompare(a.l.date || ''))
+      .map(({ l, i }) => {
+        const sets = (l.entries || []).reduce((n, e) => n + (e.sets || []).filter((x) => x.reps > 0).length, 0);
+        return '<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px">' +
+          '<span>' + esc(l.date) + ' · ' + esc(l.day) + ' · ' + sets + ' sets</span>' +
+          '<button class="bad" style="color:var(--bad)" data-del-log="' + i + '">Delete</button></div>';
+      }).join('');
+    return '<h2>Saved workouts</h2><div class="card"><p class="muted">Delete one workout at a time, or use Clear saved workouts below.</p>' + rows + '</div>';
+  }
 
   function renderData() {
     view.innerHTML =
@@ -705,6 +720,7 @@
       '<p class="muted">Copies your last 14 days of sets and current targets. Paste it into Claude. Claude replies with the plan and a target weight for each lift. Copy that reply and paste it into Import workout above.</p>' +
       '<div class="row"><button class="primary" data-training-log="1">Copy training log</button></div>' +
       '<div id="log-box"></div></div>' +
+      savedLogsHTML() +
       '<h2>Backup</h2><div class="card">' +
       '<p class="muted">Save a backup file to iCloud Drive from the share sheet (Save to Files).</p>' +
       '<div class="row"><button class="primary" data-backup="export">Export backup</button>' +
@@ -838,6 +854,13 @@
           '<div class="row" style="margin-top:8px"><button data-copy="backup-text">Copy backup</button></div>';
       }
       try { download('workout-backup-' + todayISO() + '.json', text); } catch (e) { /* downloads may be blocked */ }
+      return;
+    }
+    if (t.dataset.delLog !== undefined) {
+      const log = state.logs[Number(t.dataset.delLog)];
+      if (log && confirm('Delete the ' + log.day + ' workout from ' + log.date + '? This cannot be undone.')) {
+        state.logs.splice(Number(t.dataset.delLog), 1); save(); render(); toast('Workout deleted.', 'ok');
+      }
       return;
     }
     if (t.dataset.backup === 'clear-logs') {
