@@ -85,6 +85,20 @@
   }
 
   // Workout -----------------------------------------------------------------
+  // One chip per plan for the next four weeks, so a later week can be looked at before it starts.
+  function planPicker() {
+    const choices = state.planChoices || [];
+    if (choices.length < 2) return '';
+    const today = todayISO();
+    const shortDate = (iso) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return '<div class="muted" style="font-size:12px;margin-bottom:4px">Plans</div><div class="row">' +
+      choices.map((c) => {
+        const when = !c.starts || c.starts <= today ? 'current' : 'from ' + shortDate(c.starts);
+        return '<button class="chip ' + (c.id === state.planId ? 'on' : '') + '" data-plan="' + esc(c.id) + '">' +
+          esc((c.plan && c.plan.name) || 'Workout plan') + ' (' + when + ')</button>';
+      }).join('') + '</div>';
+  }
+
   function renderWorkout() {
     const plan = state.workoutPlan;
     let html = '';
@@ -92,6 +106,7 @@
       html += '<div class="card"><h3>No workout plan yet</h3><p class="muted">Plan with Claude, then paste or upload the JSON in the Import tab.</p></div>';
     } else {
       selectedDay = Math.min(selectedDay, plan.days.length - 1);
+      html += planPicker();
       html += '<h2>' + esc(plan.name) + '</h2><div class="row">';
       plan.days.forEach((d, i) => {
         html += '<button class="chip ' + (i === selectedDay ? 'on' : '') + '" data-day="' + i + '">' + esc(d.day || 'Day ' + (i + 1)) + (loggedThisWeek(d.title) ? ' ✓' : '') + '</button>';
@@ -767,7 +782,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.51';
+  const APP_VERSION = 'v1.52';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -843,6 +858,10 @@
       const r = L.validateWorkoutPlan(obj, index);
       if (!r.ok) { showMsgs(r.errors, r.warnings, ''); return; }
       state.workoutPlan = r.plan;
+      // An imported plan is a new plan on the account, not an edit to the one that was showing.
+      state.planId = null;
+      state.planStarts = null;
+      state.syncedPlan = null;
       selectedDay = 0;
       save();
       showMsgs([], r.warnings, 'Workout plan imported: ' + r.plan.days.length + ' days.');
@@ -968,6 +987,7 @@
       state.soreness[today][t.dataset.region] = Number(t.dataset.soreness);
       save(); render(); return;
     }
+    if (t.dataset.plan) { choosePlan(t.dataset.plan); return; }
     if (t.dataset.day != null && t.dataset.day !== '') { selectedDay = Number(t.dataset.day); render(); return; }
     if (t.dataset.import) {
       const kind = t.dataset.import;
@@ -1175,12 +1195,12 @@
     return { apikey: SUPABASE.key, Authorization: 'Bearer ' + s.access_token };
   }
 
-  // Loads the newest plan for this phone's account if it is not the one on the phone.
+  // Loads this phone's plans for the next four weeks. The active plan opens by itself when it changes; any other plan is picked from the Plans row.
   async function loadLatestPlan() {
     if (!SUPABASE || !index) return;
     const s = await getSession();
     if (!s) return;
-    const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans?select=id,plan,created_at&user_id=eq.' + s.user_id + '&order=created_at.desc&limit=30', {
+    const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans?select=id,plan,created_at&user_id=eq.' + s.user_id + '&order=created_at.desc&limit=50', {
       headers: authHeaders(s),
     });
     if (!r.ok) return;
@@ -1191,16 +1211,41 @@
     const active = rows
       .filter((x) => startOf(x) <= today)
       .sort((a, b) => (startOf(a) !== startOf(b) ? startOf(b).localeCompare(startOf(a)) : b.created_at.localeCompare(a.created_at)))[0];
-    if (!active || active.id === state.planId) return;
-    const v = L.validateWorkoutPlan(active.plan, index);
-    if (!v.ok) return;
+    const horizon = addDaysISO(today, 28);
+    const upcoming = rows
+      .filter((x) => startOf(x) > today && startOf(x) <= horizon)
+      .sort((a, b) => startOf(a).localeCompare(startOf(b)));
+    const before = JSON.stringify([state.planChoices, state.planId, state.workoutPlan]);
+    state.planChoices = [active, ...upcoming].filter(Boolean).map(choiceOf);
+    if (active && active.id !== state.autoPlanId) {
+      state.autoPlanId = active.id;
+      if (active.id !== state.planId && usePlan(choiceOf(active))) toast('New workout plan loaded.', 'ok');
+    }
+    save();
+    if (JSON.stringify([state.planChoices, state.planId, state.workoutPlan]) !== before) render();
+  }
+
+  function choiceOf(x) {
+    return { id: x.id, starts: (x.plan && x.plan.starts) || null, plan: x.plan };
+  }
+
+  // Makes a saved plan the one on this phone. Changes made to it are saved back to the same row.
+  function usePlan(c) {
+    const v = L.validateWorkoutPlan(c.plan, index);
+    if (!v.ok) return false;
     state.workoutPlan = v.plan;
-    state.planId = active.id;
+    state.planId = c.id;
+    state.planStarts = c.starts;
     state.syncedPlan = JSON.stringify(v.plan);
     selectedDay = Math.max(0, nextUnloggedDay());
+    return true;
+  }
+
+  function choosePlan(id) {
+    const c = (state.planChoices || []).find((x) => x.id === id);
+    if (!c || !usePlan(c)) { toast('That plan could not be loaded.', 'err'); return; }
     save();
     render();
-    toast('New workout plan loaded.', 'ok');
   }
 
   // Uploads the plan on this phone when it differs from the last one saved to the account.
@@ -1216,14 +1261,30 @@
     if (json === state.syncedPlan) return;
     const s = await getSession();
     if (!s) return;
+    const typed = Object.assign({ type: 'workout_plan', version: 1 }, state.workoutPlan);
+    if (state.planId) {
+      // Edits go back into the same saved plan and keep its start date.
+      const plan = state.planStarts ? Object.assign(typed, { starts: state.planStarts }) : typed;
+      const u = await fetch(SUPABASE.url + '/rest/v1/workout_plans?id=eq.' + state.planId, {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, authHeaders(s)),
+        body: JSON.stringify({ name: state.workoutPlan.name || 'Workout plan', plan }),
+      });
+      if (!u.ok) return;
+      const updated = await u.json();
+      if (updated.length) { state.syncedPlan = json; save(); return; }
+    }
+    // A new plan on this phone starts today, so it becomes the active plan.
+    const today = todayISO();
     const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans', {
       method: 'POST',
       headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, authHeaders(s)),
-      body: JSON.stringify({ user_id: s.user_id, name: state.workoutPlan.name || 'Workout plan', plan: Object.assign({ type: 'workout_plan', version: 1 }, state.workoutPlan, { starts: todayISO() }) }),
+      body: JSON.stringify({ user_id: s.user_id, name: state.workoutPlan.name || 'Workout plan', plan: Object.assign(typed, { starts: today }) }),
     });
     if (!r.ok) return;
     const rows = await r.json();
     state.planId = rows[0].id;
+    state.planStarts = today;
     state.syncedPlan = json;
     save();
   }
