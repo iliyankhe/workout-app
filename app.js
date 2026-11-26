@@ -104,6 +104,7 @@
       html += soreCheck(day);
       html += logSession(day, plan);
     }
+    html += activitySection();
     html += librarySection();
     view.innerHTML = html;
   }
@@ -324,6 +325,25 @@
     render();
   }
 
+  // Other activity (squash, biking and so on). Kept apart from the lift logs: it does not count toward the week's days or the body map.
+  const ACTIVITY_IDEAS = ['Squash', 'Biking', 'Running', 'Swimming', 'Basketball', 'Disc golf', 'Walking', 'Hiking', 'Tennis'];
+  function activitySection() {
+    const list = (state.activities || []).map((a, i) => ({ a, i })).sort((x, y) => (y.a.date || '').localeCompare(x.a.date || '')).slice(0, 10);
+    const rows = list.map(({ a, i }) =>
+      '<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px">' +
+      '<span>' + esc(a.date) + ' · ' + esc(a.name) + ' · ' + esc(a.minutes) + ' min' + (a.notes ? ' · ' + esc(a.notes) : '') + '</span>' +
+      '<button class="bad" style="color:var(--bad)" data-del-activity="' + i + '">Delete</button></div>').join('');
+    return '<h2>Other activity</h2><div class="card">' +
+      '<label>Activity</label><input id="act-name" list="act-ideas" placeholder="e.g. Squash" maxlength="99">' +
+      '<datalist id="act-ideas">' + ACTIVITY_IDEAS.map((n) => '<option value="' + esc(n) + '">').join('') + '</datalist>' +
+      '<div class="row"><div><label>Minutes</label><input id="act-minutes" class="num" inputmode="numeric" placeholder="45"></div>' +
+      '<div><label>Date</label><input id="act-date" type="date" value="' + esc(todayISO()) + '"></div></div>' +
+      '<label>Notes (optional)</label><input id="act-notes" placeholder="e.g. 3 games" maxlength="499">' +
+      '<div class="row" style="margin-top:8px"><button class="primary" id="save-activity">Save activity</button></div>' +
+      (rows ? '<p class="muted" style="margin-top:12px">Recent</p>' + rows : '') +
+      '</div>';
+  }
+
   function librarySection() {
     const q = L.normalizeName(search);
     const hits = q ? exercises.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 30) : [];
@@ -425,7 +445,11 @@
     if (!SUPABASE || flushing || !(state.uploadQueue || []).length) return;
     flushing = true;
     const next = state.uploadQueue[0];
-    getSession().catch(() => null).then((s) => fetch(SUPABASE.url + '/rest/v1/workout_logs', {
+    const isActivity = next.kind === 'activity';
+    const body = isActivity
+      ? { date: next.date, name: next.name, minutes: next.minutes, notes: next.notes || '' }
+      : { date: next.date, day: next.day, entries: next.entries, warmup: next.warmup, cooldown: next.cooldown };
+    getSession().catch(() => null).then((s) => fetch(SUPABASE.url + (isActivity ? '/rest/v1/activity_logs' : '/rest/v1/workout_logs'), {
       method: 'POST',
       headers: {
         apikey: SUPABASE.key,
@@ -433,7 +457,7 @@
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
       },
-      body: JSON.stringify({ date: next.date, day: next.day, entries: next.entries, warmup: next.warmup, cooldown: next.cooldown }),
+      body: JSON.stringify(body),
     })).then((r) => {
       const rejected = r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429 && r.status !== 401;
       if (!r.ok && !rejected) throw new Error('retry ' + r.status);
@@ -713,7 +737,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.47';
+  const APP_VERSION = 'v1.48';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -816,6 +840,29 @@
   view.addEventListener('click', (ev) => {
     const t = ev.target;
     if (t.id === 'save-session') { saveSession(Number(t.dataset.day)); return; }
+    if (t.id === 'save-activity') {
+      const name = (document.getElementById('act-name').value || '').trim();
+      const minutes = Math.round(Number(document.getElementById('act-minutes').value));
+      const date = document.getElementById('act-date').value || todayISO();
+      const notes = (document.getElementById('act-notes').value || '').trim();
+      if (!name) { toast('Type the activity, for example Squash.', 'err'); return; }
+      if (!(minutes > 0 && minutes < 1440)) { toast('Enter the minutes, for example 45.', 'err'); return; }
+      const a = { date, name, minutes, notes };
+      state.activities = (state.activities || []).concat([a]);
+      save();
+      queueUpload(Object.assign({ kind: 'activity' }, a));
+      toast('Saved ' + name + '.', 'ok');
+      render();
+      return;
+    }
+    if (t.dataset.delActivity != null) {
+      const i = Number(t.dataset.delActivity);
+      const a = (state.activities || [])[i];
+      if (a && confirm('Delete ' + a.name + ' on ' + a.date + '? This only removes it from this phone.')) {
+        state.activities.splice(i, 1); save(); render(); toast('Activity deleted.', 'ok');
+      }
+      return;
+    }
     if (t.dataset.skip) {
       // Greys out a lift for this session only. Restore brings it back. Nothing is saved for it.
       const day = state.workoutPlan.days[selectedDay];
