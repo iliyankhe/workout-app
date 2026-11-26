@@ -94,7 +94,7 @@
       selectedDay = Math.min(selectedDay, plan.days.length - 1);
       html += '<h2>' + esc(plan.name) + '</h2><div class="row">';
       plan.days.forEach((d, i) => {
-        html += '<button class="chip ' + (i === selectedDay ? 'on' : '') + '" data-day="' + i + '">' + esc(d.day || 'Day ' + (i + 1)) + '</button>';
+        html += '<button class="chip ' + (i === selectedDay ? 'on' : '') + '" data-day="' + i + '">' + esc(d.day || 'Day ' + (i + 1)) + (loggedThisWeek(d.title) ? ' ✓' : '') + '</button>';
       });
       html += '</div>';
       const day = plan.days[selectedDay];
@@ -252,12 +252,44 @@
       '<div class="row" style="margin:6px 0"><button id="check-all" data-day="' + selectedDay + '">Check all sets</button></div>' +
       day.exercises.map((ex, i) => liftBlock(ex, i, d)).join('') +
       (showCooldown ? stretchBlock('cooldown', day, plan.cooldown || {}) : '') +
-      '<div class="row" style="margin-top:12px"><button class="primary" id="save-session" data-day="' + selectedDay + '">Save workout</button></div>' +
+      (loggedThisWeek(day.title)
+        ? (() => {
+            const next = nextUnloggedDay();
+            return '<div class="msg ok" style="margin-top:12px">' + esc(day.day || day.title) + ' is logged for this week. ' +
+              (next >= 0 ? 'Next up: ' + esc(plan.days[next].day || plan.days[next].title) + '.' : 'Every workout is logged this week.') + '</div>';
+          })()
+        : '<div class="row" style="margin-top:12px"><button class="primary" id="save-session" data-day="' + selectedDay + '">Save workout</button></div>') +
       '</div>';
+  }
+
+  // A week runs Monday to Sunday. A day counts as logged for the week when a saved workout for it has a date in that week.
+  function padDate(dt) {
+    return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+  }
+  function addDaysISO(iso, n) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + n);
+    return padDate(dt);
+  }
+  function mondayOf(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dow = (new Date(y, m - 1, d).getDay() + 6) % 7;
+    return addDaysISO(iso, -dow);
+  }
+  function loggedThisWeek(title) {
+    const start = mondayOf(todayISO());
+    const end = addDaysISO(start, 6);
+    return state.logs.some((l) => l.day === title && l.date >= start && l.date <= end);
+  }
+  // Index of the first plan day not yet logged this week, or -1 when every day is logged.
+  function nextUnloggedDay() {
+    if (!state.workoutPlan) return -1;
+    return state.workoutPlan.days.findIndex((d) => !loggedThisWeek(d.title));
   }
 
   function saveSession(dayIdx) {
     const day = state.workoutPlan.days[dayIdx];
+    if (loggedThisWeek(day.title)) { toast(day.title + ' is already logged this week.', 'err'); return; }
     const date = document.getElementById('log-date').value || todayISO();
     const entries = day.exercises.map((ex) => {
       const sets = [];
@@ -282,7 +314,10 @@
     save();
     queueUpload(log);
     Object.keys(doneStretch).forEach((k) => { if (k.startsWith(prefix)) delete doneStretch[k]; });
+    const next = nextUnloggedDay();
+    selectedDay = next >= 0 ? next : dayIdx;
     toast('Saved ' + date + ' workout.', 'ok');
+    render();
   }
 
   function librarySection() {
@@ -676,7 +711,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.44';
+  const APP_VERSION = 'v1.45';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -1061,7 +1096,7 @@
     state.workoutPlan = v.plan;
     state.planId = rows[0].id;
     state.syncedPlan = JSON.stringify(v.plan);
-    selectedDay = 0;
+    selectedDay = Math.max(0, nextUnloggedDay());
     save();
     render();
     toast('New workout plan loaded.', 'ok');
@@ -1115,6 +1150,7 @@
           .catch(() => { render(); });
         return;
       }
+      selectedDay = Math.max(0, nextUnloggedDay());
       render();
     })
     .catch(() => { view.innerHTML = '<div class="msg err">Could not load the exercise library.</div>'; });
