@@ -1,8 +1,7 @@
 name: Export workout logs
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
+  # Scheduled runs are off: Claude reads workout_logs through the Supabase connector instead.
   workflow_dispatch:
 
 permissions:
