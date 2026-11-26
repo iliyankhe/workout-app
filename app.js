@@ -782,7 +782,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.52';
+  const APP_VERSION = 'v1.53';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -1208,8 +1208,12 @@
     // The active plan is the one with the latest start date that has already begun. Plans with no start date count as the beginning.
     const today = todayISO();
     const startOf = (x) => (x.plan && x.plan.starts) || '0000-00-00';
+    // A plan's week runs Monday to Sunday. A plan with no start date counts from the week it was saved in.
+    const weekEnd = (x) => addDaysISO(mondayOf((x.plan && x.plan.starts) || x.created_at.slice(0, 10)), 6);
+    const live = (x) => weekEnd(x) >= today;
+    // Plans whose week has passed drop off the list and are never loaded again.
     const active = rows
-      .filter((x) => startOf(x) <= today)
+      .filter((x) => startOf(x) <= today && live(x))
       .sort((a, b) => (startOf(a) !== startOf(b) ? startOf(b).localeCompare(startOf(a)) : b.created_at.localeCompare(a.created_at)))[0];
     const horizon = addDaysISO(today, 28);
     const upcoming = rows
