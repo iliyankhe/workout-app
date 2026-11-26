@@ -248,7 +248,14 @@
   function logSession(day, plan) {
     const d = (state.drafts || {})[day.title] || {};
     const showCooldown = !plan.cooldown || plan.cooldown.enabled !== false;
-    return '<h2>Log this workout</h2><div class="card">' +
+    const weekNote = loggedThisWeek(day.title)
+      ? (() => {
+          const next = nextUnloggedDay();
+          return '<div class="msg ok">' + esc(day.day || day.title) + ' is logged for this week. ' +
+            (next >= 0 ? 'Next up: ' + esc(plan.days[next].day || plan.days[next].title) + '.' : 'Every workout is logged this week.') + '</div>';
+        })()
+      : '';
+    return '<h2>Log this workout</h2><div class="card">' + weekNote +
       '<label>Date</label><input type="date" id="log-date" value="' + esc(d.__date || todayISO()) + '">' +
       '<p class="muted" style="font-size:12px">Each entry is saved as you type, so nothing is lost if the page closes.</p>' +
       stretchBlock('warmup', day, plan.cooldown || {}) +
@@ -257,11 +264,7 @@
       day.exercises.map((ex, i) => liftBlock(ex, i, d)).join('') +
       (showCooldown ? stretchBlock('cooldown', day, plan.cooldown || {}) : '') +
       (loggedThisWeek(day.title)
-        ? (() => {
-            const next = nextUnloggedDay();
-            return '<div class="msg ok" style="margin-top:12px">' + esc(day.day || day.title) + ' is logged for this week. ' +
-              (next >= 0 ? 'Next up: ' + esc(plan.days[next].day || plan.days[next].title) + '.' : 'Every workout is logged this week.') + '</div>';
-          })()
+        ? ''
         : '<div class="row" style="margin-top:12px"><button class="primary" id="save-session" data-day="' + selectedDay + '">Save workout</button></div>') +
       '</div>';
   }
@@ -764,7 +767,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.49';
+  const APP_VERSION = 'v1.50';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
