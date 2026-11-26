@@ -767,7 +767,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.50';
+  const APP_VERSION = 'v1.51';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -1180,16 +1180,22 @@
     if (!SUPABASE || !index) return;
     const s = await getSession();
     if (!s) return;
-    const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans?select=id,plan&user_id=eq.' + s.user_id + '&order=created_at.desc&limit=1', {
+    const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans?select=id,plan,created_at&user_id=eq.' + s.user_id + '&order=created_at.desc&limit=30', {
       headers: authHeaders(s),
     });
     if (!r.ok) return;
     const rows = await r.json();
-    if (!rows.length || rows[0].id === state.planId) return;
-    const v = L.validateWorkoutPlan(rows[0].plan, index);
+    // The active plan is the one with the latest start date that has already begun. Plans with no start date count as the beginning.
+    const today = todayISO();
+    const startOf = (x) => (x.plan && x.plan.starts) || '0000-00-00';
+    const active = rows
+      .filter((x) => startOf(x) <= today)
+      .sort((a, b) => (startOf(a) !== startOf(b) ? startOf(b).localeCompare(startOf(a)) : b.created_at.localeCompare(a.created_at)))[0];
+    if (!active || active.id === state.planId) return;
+    const v = L.validateWorkoutPlan(active.plan, index);
     if (!v.ok) return;
     state.workoutPlan = v.plan;
-    state.planId = rows[0].id;
+    state.planId = active.id;
     state.syncedPlan = JSON.stringify(v.plan);
     selectedDay = Math.max(0, nextUnloggedDay());
     save();
@@ -1213,7 +1219,7 @@
     const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans', {
       method: 'POST',
       headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, authHeaders(s)),
-      body: JSON.stringify({ user_id: s.user_id, name: state.workoutPlan.name || 'Workout plan', plan: Object.assign({ type: 'workout_plan', version: 1 }, state.workoutPlan) }),
+      body: JSON.stringify({ user_id: s.user_id, name: state.workoutPlan.name || 'Workout plan', plan: Object.assign({ type: 'workout_plan', version: 1 }, state.workoutPlan, { starts: todayISO() }) }),
     });
     if (!r.ok) return;
     const rows = await r.json();
