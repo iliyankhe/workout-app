@@ -675,7 +675,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.42';
+  const APP_VERSION = 'v1.43';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -1062,7 +1062,7 @@
     const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans', {
       method: 'POST',
       headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, authHeaders(s)),
-      body: JSON.stringify({ user_id: s.user_id, name: state.workoutPlan.name || 'Workout plan', plan: state.workoutPlan }),
+      body: JSON.stringify({ user_id: s.user_id, name: state.workoutPlan.name || 'Workout plan', plan: Object.assign({ type: 'workout_plan', version: 1 }, state.workoutPlan) }),
     });
     if (!r.ok) return;
     const rows = await r.json();
