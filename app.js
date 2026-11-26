@@ -325,8 +325,35 @@
     render();
   }
 
-  // Other activity (squash, biking and so on). Kept apart from the lift logs: it does not count toward the week's days or the body map.
+  // Other activity (squash, biking and so on). Kept apart from the lift logs. It counts toward the body map, not toward the week's days.
   const ACTIVITY_IDEAS = ['Squash', 'Biking', 'Running', 'Swimming', 'Basketball', 'Disc golf', 'Walking', 'Hiking', 'Tennis'];
+  // Which body-map muscles each activity works. Primary counts in full, secondary counts half.
+  const ACTIVITY_MUSCLES = {
+    squash: { primary: ['quadriceps', 'calves', 'glutes'], secondary: ['forearms', 'shoulders', 'obliques'] },
+    biking: { primary: ['quadriceps', 'hamstrings', 'glutes'], secondary: ['calves'] },
+    running: { primary: ['quadriceps', 'hamstrings', 'calves', 'glutes'], secondary: ['abdominals'] },
+    swimming: { primary: ['lats', 'shoulders'], secondary: ['triceps', 'chest', 'abdominals'] },
+    basketball: { primary: ['quadriceps', 'calves'], secondary: ['glutes', 'shoulders', 'forearms'] },
+    'disc golf': { primary: ['shoulders', 'obliques'], secondary: ['forearms', 'middle back'] },
+    walking: { primary: ['calves', 'glutes'], secondary: ['hamstrings'] },
+    hiking: { primary: ['quadriceps', 'glutes', 'calves'], secondary: ['hamstrings', 'lower back'] },
+    tennis: { primary: ['shoulders', 'forearms', 'obliques'], secondary: ['quadriceps', 'calves', 'glutes'] },
+  };
+  // Activities count toward the body map as sets: about one set per 15 minutes.
+  function activityKey(name) { return L.normalizeName(name); }
+  function bodyLogs() {
+    const acts = (state.activities || []).filter((a) => ACTIVITY_MUSCLES[activityKey(a.name)]);
+    return state.logs.concat(acts.map((a) => ({
+      date: a.date, day: 'activity',
+      entries: [{ exercise_id: 'activity:' + activityKey(a.name), sets: Array.from({ length: Math.max(1, Math.round(a.minutes / 15)) }, () => ({ reps: 1, weight_lb: 0 })) }],
+    })));
+  }
+  function bodyExercises() {
+    const virtual = Object.keys(ACTIVITY_MUSCLES).map((k) => ({
+      id: 'activity:' + k, name: k, primaryMuscles: ACTIVITY_MUSCLES[k].primary, secondaryMuscles: ACTIVITY_MUSCLES[k].secondary,
+    }));
+    return exercises.concat(virtual);
+  }
   function activitySection() {
     const list = (state.activities || []).map((a, i) => ({ a, i })).sort((x, y) => (y.a.date || '').localeCompare(x.a.date || '')).slice(0, 10);
     const rows = list.map(({ a, i }) =>
@@ -570,8 +597,8 @@
   // excludeToday: used before training, so the workout you are about to do does not count as soreness.
   function soreByRegion(excludeToday) {
     const today = todayISO();
-    const logs = excludeToday ? state.logs.filter((l) => l.date !== today) : state.logs;
-    const sore = L.autoSoreness(logs, exercises, today);
+    const logs = excludeToday ? bodyLogs().filter((l) => l.date !== today) : bodyLogs();
+    const sore = L.autoSoreness(logs, bodyExercises(), today);
     const manual = (state.soreness && state.soreness[today]) || {};
     for (const [region, level] of Object.entries(manual)) {
       if (level > 0) sore[region] = { level, source: 'manual' };
@@ -607,7 +634,7 @@
   }
 
   function renderBody() {
-    const load = L.weeklyLoad(state.logs, exercises, todayISO(), 7);
+    const load = L.weeklyLoad(bodyLogs(), bodyExercises(), todayISO(), 7);
     const sore = soreByRegion();
     const chip = (k, label) => '<button class="chip ' + (bodyMode === k ? 'on' : '') + '" data-bodymode="' + k + '">' + label + '</button>';
     view.innerHTML =
@@ -737,7 +764,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.48';
+  const APP_VERSION = 'v1.49';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
