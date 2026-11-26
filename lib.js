@@ -307,9 +307,9 @@
   // ---- Body map: muscle regions --------------------------------------------
   // Maps the dataset's muscle names onto the regions shown on the body map.
   const REGION_OF = {
-    abdominals: 'abs', obliques: 'obliques', chest: 'chest', shoulders: 'shoulders', biceps: 'biceps', triceps: 'triceps',
+    abdominals: 'abs', obliques: 'abs', chest: 'chest', shoulders: 'shoulders', biceps: 'biceps', triceps: 'triceps',
     forearms: 'forearms', quadriceps: 'quads', hamstrings: 'hamstrings', glutes: 'glutes', abductors: 'glutes',
-    calves: 'calves', adductors: 'adductors', lats: 'lats', 'middle back': 'upper_back', traps: 'upper_back',
+    calves: 'calves', adductors: 'adductors', lats: 'back', 'middle back': 'back', traps: 'back',
     'lower back': 'lower_back', neck: 'neck',
   };
 

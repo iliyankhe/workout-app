@@ -8,6 +8,9 @@
   const BASE = 0x7d7d95; // muscle colour for unhighlighted body
   const SEAM = 0x2c2c3c; // dark lines between muscle groups
   const SKIN = 0x464658; // head, hands, feet and joints (darker)
+  // Model regions shown as one body-map region each (Back and Abs combine two).
+  const DISPLAY = { lats: 'back', upper_back: 'back', obliques: 'abs' };
+  const displayRegion = (r) => DISPLAY[r] || r;
   const HEAT = new THREE.Color(0xef6461);
   const SORE_COLORS = [null, 0xf0b429, 0xf0893b, 0xef4444];
 
@@ -76,7 +79,7 @@
           const mesh = new THREE.Mesh(geom, new THREE.MeshLambertMaterial({
             color: unmapped ? SKIN : BASE, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
           }));
-          mesh.userData.region = unmapped ? null : g.region;
+          mesh.userData.region = unmapped ? null : displayRegion(g.region);
           mesh.userData.base = unmapped ? SKIN : BASE;
           group.add(mesh);
           if (!unmapped) meshes.push(mesh);
@@ -120,7 +123,7 @@
         mesh.scale.set(...part.s);
       }
       mesh.material = new THREE.MeshStandardMaterial({ color: BASE, roughness: 0.6, metalness: 0.05 });
-      mesh.userData.region = part.r;
+      mesh.userData.region = displayRegion(part.r);
       mesh.userData.base = BASE;
       group.add(mesh);
       if (part.r) meshes.push(mesh);

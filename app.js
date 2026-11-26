@@ -201,6 +201,8 @@
     const meta = esc(ex.sets) + ' sets × ' + esc(ex.reps || '?') + ' reps' +
       (ex.rest_sec ? ' · rest ' + esc(ex.rest_sec) + 's' : '') +
       (hasLast ? ' · last ' + esc(last) + ' lb' : '');
+    const skipped = !!d[ex.exercise_id + '|skip'];
+    const dis = skipped ? ' disabled' : '';
     let rows = '';
     let ticked = 0;
     for (let s = 0; s < ex.sets; s++) {
@@ -209,13 +211,13 @@
       const wV = d[key + '|weight_lb'] != null ? d[key + '|weight_lb'] : (ex.target_lb != null ? ex.target_lb : (hasLast ? last : ''));
       const done = !!d[key + '|done'];
       if (done) ticked++;
-      rows += '<tr class="' + (done ? 'done' : '') + '"><td><label class="check" style="margin:0"><input type="checkbox" data-done="' + esc(key) + '" ' + (done ? 'checked' : '') + '> Set ' + (s + 1) + '</label></td>' +
-        '<td><input class="num" inputmode="numeric" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="reps" value="' + esc(repsV) + '" placeholder="reps"></td>' +
-        '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(wV) + '" placeholder="lb"></td>' +
+      rows += '<tr class="' + (done ? 'done' : '') + '"><td><label class="check" style="margin:0"><input type="checkbox" data-done="' + esc(key) + '" ' + (done ? 'checked' : '') + dis + '> Set ' + (s + 1) + '</label></td>' +
+        '<td><input class="num" inputmode="numeric" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="reps" value="' + esc(repsV) + '" placeholder="reps"' + dis + '></td>' +
+        '<td><input class="num" inputmode="decimal" data-ex="' + esc(ex.exercise_id) + '" data-set="' + s + '" data-f="weight_lb" value="' + esc(wV) + '" placeholder="lb"' + dis + '></td>' +
         '<td><button class="chip" data-timer="' + rest + '" data-label="' + esc(exName(ex.exercise_id)) + ' rest">Rest ' + esc(rest) + 's</button></td></tr>';
     }
     const muscles = e ? [].concat(e.primaryMuscles, e.secondaryMuscles).map((m) => '<span class="pill">' + esc(m) + '</span>').join('') : '';
-    return '<div class="lift' + (ex.sets && ticked === ex.sets ? ' done' : '') + '">' +
+    return '<div class="lift' + (ex.sets && ticked === ex.sets ? ' done' : '') + (skipped ? ' skipped' : '') + '">' +
       '<div><strong>' + (i + 1) + '. ' + esc(e ? e.name : ex.exercise_id) + '</strong></div>' +
       '<div class="meta">' + meta + '</div>' +
       (ex.notes ? '<div class="meta">' + esc(ex.notes) + '</div>' : '') +
@@ -228,7 +230,8 @@
       '<table><thead><tr><th></th><th>Reps</th><th>Weight</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
       '<div style="margin-top:6px">' + muscles + '</div>' +
       detailsHTML(e) +
-      (e ? '<div class="row" style="margin-top:8px"><button class="chip" data-replace="' + i + '">Replace</button></div>' : '') +
+      '<div class="row" style="margin-top:8px"><button class="chip" data-skip="' + esc(ex.exercise_id) + '">' + (skipped ? 'Restore' : 'Skip today') + '</button>' +
+      (e ? '<button class="chip" data-replace="' + i + '">Replace</button>' : '') + '</div>' +
       (swapOpen && swapOpen.day === selectedDay && swapOpen.idx === i ? swapPanel(i) : '') +
       '</div>';
   }
@@ -291,7 +294,8 @@
     const day = state.workoutPlan.days[dayIdx];
     if (loggedThisWeek(day.title)) { toast(day.title + ' is already logged this week.', 'err'); return; }
     const date = document.getElementById('log-date').value || todayISO();
-    const entries = day.exercises.map((ex) => {
+    const dayDraft = (state.drafts || {})[day.title] || {};
+    const entries = day.exercises.filter((ex) => !dayDraft[ex.exercise_id + '|skip']).map((ex) => {
       const sets = [];
       for (let s = 0; s < ex.sets; s++) {
         const reps = view.querySelector('[data-ex="' + ex.exercise_id + '"][data-set="' + s + '"][data-f="reps"]');
@@ -507,17 +511,15 @@
   const REGION_NAMES = {
     abs: 'Abs', chest: 'Chest (pecs)', shoulders: 'Shoulders', biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms',
     quads: 'Quads', hamstrings: 'Hamstrings', glutes: 'Glutes', adductors: 'Inner thigh', calves: 'Calves',
-    lats: 'Lats', obliques: 'Obliques', upper_back: 'Upper back', lower_back: 'Lower back', neck: 'Neck',
+    back: 'Back', lower_back: 'Lower back', neck: 'Neck',
   };
   // What each muscle group covers, what it does, and what trains it. Shown in the muscle's panel and in the guide.
   const REGION_INFO = {
     chest: { muscles: 'Pectoralis major (upper, middle and lower fibres) and pectoralis minor', does: 'Pulls the upper arm across the body and in front, and pushes forward.', trained: 'Bench press, push-ups, cable flyes' },
     shoulders: { muscles: 'Deltoids: front, side and rear heads, over the top of the shoulder joint', does: 'Raises the arm forward, out to the side and back, and steadies the shoulder.', trained: 'Overhead press, lateral raises, rear delt flyes' },
-    upper_back: { muscles: 'Trapezius (upper and middle) and rhomboids, between the shoulder blades and up the neck', does: 'Moves and holds the shoulder blades, and helps with posture.', trained: 'Rows, face pulls, shrugs' },
-    lats: { muscles: 'Latissimus dorsi, the broad muscles of the back from the spine to the upper arm', does: 'Pulls the arm down and back, and draws the shoulder blade down.', trained: 'Pull-ups, lat pulldowns, rows' },
+    back: { muscles: 'Latissimus dorsi, trapezius and rhomboids: the broad muscles of the back and between the shoulder blades', does: 'Pulls the arms down and back, and moves and holds the shoulder blades.', trained: 'Lat pulldowns, rows, pull-ups, face pulls' },
     lower_back: { muscles: 'Erector spinae, the muscles running either side of the spine', does: 'Keeps the spine upright and extends the back.', trained: 'Deadlifts, back extensions, good mornings' },
-    abs: { muscles: 'Rectus abdominis (the front of the belly, upper and lower)', does: 'Bends the trunk forward and stabilises the core.', trained: 'Crunches, leg raises, planks' },
-    obliques: { muscles: 'External and internal obliques, along the sides of the waist', does: 'Rotates and side-bends the trunk.', trained: 'Side bends, Russian twists, cable chops' },
+    abs: { muscles: 'Rectus abdominis and the obliques along the sides of the waist', does: 'Bends the trunk forward, rotates and side-bends it, and stabilises the core.', trained: 'Cable crunches, leg raises, planks, side bends' },
     biceps: { muscles: 'Biceps brachii, the front of the upper arm', does: 'Bends the elbow and turns the palm up.', trained: 'Curls, chin-ups, hammer curls' },
     triceps: { muscles: 'Triceps brachii, the back of the upper arm (three heads)', does: 'Straightens the elbow.', trained: 'Pushdowns, dips, skull crushers' },
     forearms: { muscles: 'Flexors and extensors of the wrist and fingers', does: 'Bends and straightens the wrist, and grips.', trained: 'Wrist curls, farmer carries, dead hangs' },
@@ -711,7 +713,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.46';
+  const APP_VERSION = 'v1.47';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -814,11 +816,21 @@
   view.addEventListener('click', (ev) => {
     const t = ev.target;
     if (t.id === 'save-session') { saveSession(Number(t.dataset.day)); return; }
+    if (t.dataset.skip) {
+      // Greys out a lift for this session only. Restore brings it back. Nothing is saved for it.
+      const day = state.workoutPlan.days[selectedDay];
+      const d = draftFor(day.title);
+      const key = t.dataset.skip + '|skip';
+      if (d[key]) delete d[key]; else d[key] = true;
+      save();
+      render();
+      return;
+    }
     if (t.id === 'check-all') {
       // Ticks every set of every lift in this workout, or clears them all if they are already ticked.
       const day = state.workoutPlan.days[selectedDay];
       const d = draftFor(day.title);
-      const boxes = [...view.querySelectorAll('[data-done]')];
+      const boxes = [...view.querySelectorAll('[data-done]')].filter((cb) => !cb.disabled);
       const val = boxes.some((cb) => !cb.checked);
       boxes.forEach((cb) => {
         cb.checked = val;
