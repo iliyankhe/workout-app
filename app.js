@@ -220,7 +220,9 @@
       '<div class="row" style="margin:8px 0"><span class="muted">Target</span>' +
         '<input class="num" inputmode="decimal" data-target="' + esc(ex.exercise_id) + '" value="' + esc(ex.target_lb != null ? ex.target_lb : '') + '" placeholder="lb">' +
         '<button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="-5">−5 lb</button>' +
-        '<button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="5">+5 lb</button></div>' +
+        '<button class="chip" data-adjust="' + esc(ex.exercise_id) + '" data-step="5">+5 lb</button>' +
+        '<button class="chip" data-sets="' + esc(ex.exercise_id) + '" data-delta="-1">− set</button>' +
+        '<button class="chip" data-sets="' + esc(ex.exercise_id) + '" data-delta="1">+ set</button></div>' +
       '<table><thead><tr><th></th><th>Reps</th><th>Weight</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
       '<div style="margin-top:6px">' + muscles + '</div>' +
       detailsHTML(e) +
@@ -671,7 +673,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.40';
+  const APP_VERSION = 'v1.41';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -777,6 +779,14 @@
     if (t.dataset.replace != null) { swapOpen = { day: selectedDay, idx: Number(t.dataset.replace) }; render(); return; }
     if (t.dataset.cancelSwap != null) { swapOpen = null; render(); return; }
     if (t.dataset.timer) { startTimer(t.dataset.label || 'Timer', Number(t.dataset.timer)); return; }
+    if (t.dataset.sets) {
+      // Adds or removes one set of this lift in the plan (1 to 10 sets).
+      const day = state.workoutPlan.days[selectedDay];
+      const ex = day.exercises.find((x) => x.exercise_id === t.dataset.sets);
+      const next = ex ? Math.min(10, Math.max(1, ex.sets + Number(t.dataset.delta))) : 0;
+      if (ex && next !== ex.sets) { ex.sets = next; save(); render(); }
+      return;
+    }
     if (t.dataset.adjust) {
       // Moves the weight of every set of this lift by the step, and saves it.
       const day = state.workoutPlan.days[selectedDay];
