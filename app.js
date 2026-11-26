@@ -421,17 +421,17 @@
     if (!SUPABASE || flushing || !(state.uploadQueue || []).length) return;
     flushing = true;
     const next = state.uploadQueue[0];
-    fetch(SUPABASE.url + '/rest/v1/workout_logs', {
+    getSession().catch(() => null).then((s) => fetch(SUPABASE.url + '/rest/v1/workout_logs', {
       method: 'POST',
       headers: {
         apikey: SUPABASE.key,
-        Authorization: 'Bearer ' + SUPABASE.key,
+        Authorization: 'Bearer ' + (s ? s.access_token : SUPABASE.key),
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
       },
       body: JSON.stringify({ date: next.date, day: next.day, entries: next.entries, warmup: next.warmup, cooldown: next.cooldown }),
-    }).then((r) => {
-      const rejected = r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429;
+    })).then((r) => {
+      const rejected = r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429 && r.status !== 401;
       if (!r.ok && !rejected) throw new Error('retry ' + r.status);
       if (!r.ok) toast('A workout could not be uploaded (error ' + r.status + '). It is still saved on this phone.', 'err');
       state.uploadQueue = state.uploadQueue.slice(1);
@@ -711,7 +711,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.45';
+  const APP_VERSION = 'v1.46';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -1058,7 +1058,13 @@
     return state.session;
   }
 
-  async function getSession() {
+  let sessionPromise = null;
+  function getSession() {
+    if (!sessionPromise) sessionPromise = fetchSession().finally(() => { sessionPromise = null; });
+    return sessionPromise;
+  }
+
+  async function fetchSession() {
     if (!SUPABASE) return null;
     const s = state.session;
     if (s && s.expires_at > Date.now() + 60000) return s;
