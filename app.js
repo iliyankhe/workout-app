@@ -31,9 +31,11 @@
   function blank() {
     return { workoutPlan: null, mealPlan: null, logs: [], pantry: [], checked: {}, mealUnit: 'g', soreness: {} };
   }
+  let planSyncTimer = null;
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); }
     catch (e) { toast('Storage is full. Export a backup and remove old logs.', 'err'); }
+    schedulePlanSync();
   }
   function todayISO() {
     const d = new Date();
@@ -673,7 +675,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.41';
+  const APP_VERSION = 'v1.42';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -990,22 +992,83 @@
     setInterval(drawTimer, 250);
   }
 
-  // Plans made in Claude are saved to workout_plans. When a plan this phone has not loaded yet is there, it replaces the current plan.
-  function loadLatestPlan() {
+  // Plans sync to workout_plans under an anonymous account that belongs to this phone. Plans made in Claude
+  // appear here on the next open; plan edits made on this phone are uploaded as a new row a moment later.
+  // If anonymous sign-in is off or the phone is offline, the plan simply stays on the phone.
+  function storeSession(j) {
+    if (!j || !j.access_token || !j.user) return null;
+    state.session = { access_token: j.access_token, refresh_token: j.refresh_token, user_id: j.user.id, expires_at: Date.now() + (j.expires_in || 3600) * 1000 };
+    save();
+    return state.session;
+  }
+
+  async function getSession() {
+    if (!SUPABASE) return null;
+    const s = state.session;
+    if (s && s.expires_at > Date.now() + 60000) return s;
+    if (s && s.refresh_token) {
+      const r = await fetch(SUPABASE.url + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST', headers: { apikey: SUPABASE.key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: s.refresh_token }),
+      });
+      if (r.ok) return storeSession(await r.json());
+    }
+    const r = await fetch(SUPABASE.url + '/auth/v1/signup', {
+      method: 'POST', headers: { apikey: SUPABASE.key, 'Content-Type': 'application/json' }, body: '{}',
+    });
+    if (!r.ok) return null;
+    return storeSession(await r.json());
+  }
+
+  function authHeaders(s) {
+    return { apikey: SUPABASE.key, Authorization: 'Bearer ' + s.access_token };
+  }
+
+  // Loads the newest plan for this phone's account if it is not the one on the phone.
+  async function loadLatestPlan() {
     if (!SUPABASE || !index) return;
-    fetch(SUPABASE.url + '/rest/v1/workout_plans?select=id,plan&order=created_at.desc&limit=1', {
-      headers: { apikey: SUPABASE.key, Authorization: 'Bearer ' + SUPABASE.key },
-    }).then((r) => (r.ok ? r.json() : null)).then((rows) => {
-      if (!rows || !rows.length || rows[0].id === state.planId) return;
-      const r = L.validateWorkoutPlan(rows[0].plan, index);
-      if (!r.ok) return;
-      state.workoutPlan = r.plan;
-      state.planId = rows[0].id;
-      selectedDay = 0;
-      save();
-      render();
-      toast('New workout plan loaded.', 'ok');
-    }).catch(() => { /* offline: keep the plan on this phone */ });
+    const s = await getSession();
+    if (!s) return;
+    const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans?select=id,plan&user_id=eq.' + s.user_id + '&order=created_at.desc&limit=1', {
+      headers: authHeaders(s),
+    });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (!rows.length || rows[0].id === state.planId) return;
+    const v = L.validateWorkoutPlan(rows[0].plan, index);
+    if (!v.ok) return;
+    state.workoutPlan = v.plan;
+    state.planId = rows[0].id;
+    state.syncedPlan = JSON.stringify(v.plan);
+    selectedDay = 0;
+    save();
+    render();
+    toast('New workout plan loaded.', 'ok');
+  }
+
+  // Uploads the plan on this phone when it differs from the last one saved to the account.
+  function schedulePlanSync() {
+    if (!window.SUPABASE_CONFIG || !state.workoutPlan) return;
+    clearTimeout(planSyncTimer);
+    planSyncTimer = setTimeout(syncPlan, 1500);
+  }
+
+  async function syncPlan() {
+    if (!SUPABASE || !index || !state.workoutPlan) return;
+    const json = JSON.stringify(state.workoutPlan);
+    if (json === state.syncedPlan) return;
+    const s = await getSession();
+    if (!s) return;
+    const r = await fetch(SUPABASE.url + '/rest/v1/workout_plans', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=representation' }, authHeaders(s)),
+      body: JSON.stringify({ user_id: s.user_id, name: state.workoutPlan.name || 'Workout plan', plan: state.workoutPlan }),
+    });
+    if (!r.ok) return;
+    const rows = await r.json();
+    state.planId = rows[0].id;
+    state.syncedPlan = json;
+    save();
   }
 
   // ---- boot ----------------------------------------------------------------
@@ -1016,7 +1079,7 @@
     .then((data) => {
       exercises = data;
       index = L.buildLibraryIndex(exercises);
-      loadLatestPlan();
+      loadLatestPlan().then(() => schedulePlanSync()).catch(() => schedulePlanSync());
       // First open with no workout plan: load the starter plan once. Plans already on the device are never replaced.
       if (!state.workoutPlan && !state.starterSeen) {
         fetch('data/starter_plan.json')
