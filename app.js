@@ -249,6 +249,7 @@
       '<p class="muted" style="font-size:12px">Each entry is saved as you type, so nothing is lost if the page closes.</p>' +
       stretchBlock('warmup', day, plan.cooldown || {}) +
       '<h3 style="margin-top:14px">Lifts</h3>' +
+      '<div class="row" style="margin:6px 0"><button id="check-all" data-day="' + selectedDay + '">Check all sets</button></div>' +
       day.exercises.map((ex, i) => liftBlock(ex, i, d)).join('') +
       (showCooldown ? stretchBlock('cooldown', day, plan.cooldown || {}) : '') +
       '<div class="row" style="margin-top:12px"><button class="primary" id="save-session" data-day="' + selectedDay + '">Save workout</button></div>' +
@@ -675,7 +676,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.43';
+  const APP_VERSION = 'v1.44';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -778,6 +779,26 @@
   view.addEventListener('click', (ev) => {
     const t = ev.target;
     if (t.id === 'save-session') { saveSession(Number(t.dataset.day)); return; }
+    if (t.id === 'check-all') {
+      // Ticks every set of every lift in this workout, or clears them all if they are already ticked.
+      const day = state.workoutPlan.days[selectedDay];
+      const d = draftFor(day.title);
+      const boxes = [...view.querySelectorAll('[data-done]')];
+      const val = boxes.some((cb) => !cb.checked);
+      boxes.forEach((cb) => {
+        cb.checked = val;
+        d[cb.dataset.done + '|done'] = val;
+        const tr = cb.closest('tr');
+        if (tr) tr.classList.toggle('done', val);
+      });
+      view.querySelectorAll('.lift').forEach((l) => {
+        const b = [...l.querySelectorAll('[data-done]')];
+        if (b.length) l.classList.toggle('done', b.every((x) => x.checked));
+      });
+      t.textContent = val ? 'Clear all checks' : 'Check all sets';
+      save();
+      return;
+    }
     if (t.dataset.replace != null) { swapOpen = { day: selectedDay, idx: Number(t.dataset.replace) }; render(); return; }
     if (t.dataset.cancelSwap != null) { swapOpen = null; render(); return; }
     if (t.dataset.timer) { startTimer(t.dataset.label || 'Timer', Number(t.dataset.timer)); return; }
