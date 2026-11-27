@@ -783,7 +783,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.54';
+  const APP_VERSION = 'v1.55';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
@@ -986,6 +986,7 @@
       state.soreness = state.soreness || {};
       state.soreness[today] = state.soreness[today] || {};
       state.soreness[today][t.dataset.region] = Number(t.dataset.soreness);
+      queueSoreness(today, t.dataset.region, Number(t.dataset.soreness));
       save(); render(); return;
     }
     if (t.dataset.plan) { choosePlan(t.dataset.plan); return; }
@@ -1294,9 +1295,34 @@
     save();
   }
 
+  // Soreness entered by hand is saved to the account, so the weekly plan can use it.
+  // Entries wait in a queue until they are saved, so an offline entry is not lost.
+  function queueSoreness(date, region, level) {
+    state.sorenessQueue = (state.sorenessQueue || []).filter((x) => !(x.date === date && x.region === region));
+    state.sorenessQueue.push({ date, region, level });
+    save();
+    flushSoreness();
+  }
+
+  async function flushSoreness() {
+    if (!SUPABASE || !(state.sorenessQueue || []).length) return;
+    const s = await getSession();
+    if (!s) return;
+    const pending = state.sorenessQueue.slice();
+    const r = await fetch(SUPABASE.url + '/rest/v1/soreness_logs', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }, authHeaders(s)),
+      body: JSON.stringify(pending.map((x) => ({ user_id: s.user_id, date: x.date, region: x.region, level: x.level }))),
+    });
+    if (!r.ok) return;
+    state.sorenessQueue = state.sorenessQueue.filter((x) => !pending.includes(x));
+    save();
+  }
+
   // ---- boot ----------------------------------------------------------------
   setupTimerBar();
   flushUploads();
+  flushSoreness();
   fetch('data/exercises.json')
     .then((r) => r.json())
     .then((data) => {
