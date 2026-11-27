@@ -298,8 +298,9 @@
     const dow = (new Date(y, m - 1, d).getDay() + 6) % 7;
     return addDaysISO(iso, -dow);
   }
+  // A plan's week is the Monday-to-Sunday week it starts in. A plan with no start date uses this week.
   function loggedThisWeek(title) {
-    const start = mondayOf(todayISO());
+    const start = mondayOf(state.planStarts || todayISO());
     const end = addDaysISO(start, 6);
     return state.logs.some((l) => l.day === title && l.date >= start && l.date <= end);
   }
@@ -782,7 +783,7 @@
 
   // Import & backup --------------------------------------------------------
   // Shown on the Import tab so you can tell which version of the app your phone has loaded.
-  const APP_VERSION = 'v1.53';
+  const APP_VERSION = 'v1.54';
 
   const PROMPT = [
     'Plan my week using this exact JSON format, and output only the JSON.',
